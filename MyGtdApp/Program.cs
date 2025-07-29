@@ -56,6 +56,9 @@ static string? ConvertUrlToNpgsql(string? url)
     var user = userPass[0];
     var pass = userPass.Length > 1 ? userPass[1] : "";
 
-    return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};" +
+    // 👇 [수정된 부분] uri.Port가 -1 (명시되지 않음)이면 기본 포트 5432를 사용합니다.
+    var port = uri.Port != -1 ? uri.Port : 5432;
+
+    return $"Host={uri.Host};Port={port};Database={uri.AbsolutePath.TrimStart('/')};" +
            $"Username={user};Password={pass};Ssl Mode=Require;Trust Server Certificate=true";
 }
