@@ -1,0 +1,52 @@
+﻿@using MyGtdApp.Models
+@using Microsoft.AspNetCore.Components.Web
+
+@* [수정됨] 오류가 발생하지 않도록 클래스 속성과 더블클릭 이벤트를 올바르게 정의합니다. *@
+<div class="task-card-content @(Task.IsCompleted ? "is-completed" : "") @DueDateClass"
+     @ondblclick="() => OnTaskDoubleClick.InvokeAsync(Task.Id)">
+
+    <input type="checkbox" class="task-checkbox"
+           checked="@Task.IsCompleted"
+           @onchange="() => OnTaskCompletedToggle.InvokeAsync(Task.Id)" />
+
+    <span class="task-title">@Task.Title</span>
+
+    @* 삭제 버튼 클릭 시 부모 요소의 이벤트(ondblclick)가 함께 실행되는 것을 막기 위해 stopPropagation을 추가합니다. *@
+    <button class="action-btn simple-delete" @onclick:stopPropagation="true" @onclick="() => OnTaskDeleted.InvokeAsync(Task.Id)" title="Delete Task">×</button>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskItem Task { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<int> OnTaskDeleted { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnTaskCompletedToggle { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnTaskDoubleClick { get; set; }
+
+    // 마감일 상태에 따라 CSS 클래스를 반환하는 도우미 속성
+    private string DueDateClass
+    {
+        get
+        {
+            if (Task.IsCompleted || !Task.DueDate.HasValue)
+            {
+                return "";
+            }
+            var today = DateTime.Today;
+            if (Task.DueDate.Value.Date < today)
+            {
+                return "is-overdue"; // 마감일 지남
+            }
+            if (Task.DueDate.Value.Date == today)
+            {
+                return "is-due-today"; // 마감일 오늘
+            }
+            return "";
+        }
+    }
+}

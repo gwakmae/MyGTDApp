@@ -1,0 +1,63 @@
+﻿@using MyGtdApp.Services
+@inject ITaskService TaskService
+@implements IDisposable
+
+<div class="navmenu">
+    <nav class="nav flex-column">
+        <div class="nav-section-header">Views</div>
+        <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+            <span class="bi bi-grid-fill" aria-hidden="true"></span> GTD Board
+        </NavLink>
+
+        <div class="nav-section-header">Contexts</div>
+        @if (allContexts.Any())
+        {
+            @foreach (var context in allContexts)
+            {
+                <NavLink class="nav-link" href="@($"/context/{context.Replace("@", "")}")">
+                    <span class="bi bi-tag-fill" aria-hidden="true"></span> @context
+                </NavLink>
+            }
+        }
+        else
+        {
+            <span class="nav-link-text">No contexts yet.</span>
+        }
+    </nav>
+</div>
+
+@code {
+    private List<string> allContexts = new();
+
+    // 1. 컴포넌트 초기화
+    protected override async Task OnInitializedAsync()
+    {
+        // OnChange 이벤트 구독
+        TaskService.OnChange += HandleDataChange;
+        // 최초 컨텍스트 목록 로드
+        await LoadContexts();
+    }
+
+    // 2. 컨텍스트 목록을 로드하는 메서드
+    private async Task LoadContexts()
+    {
+        allContexts = await TaskService.GetAllContextsAsync();
+    }
+
+    // 3. OnChange 이벤트가 발생했을 때 실행될 핸들러
+    private void HandleDataChange()
+    {
+        // UI 스레드에서 안전하게 실행되도록 InvokeAsync 사용
+        InvokeAsync(async () =>
+        {
+            await LoadContexts(); // 데이터 다시 로드
+            StateHasChanged();    // 화면 갱신 요청
+        });
+    }
+
+    // 4. 컴포넌트가 제거될 때 이벤트 구독 해제 (메모리 누수 방지)
+    public void Dispose()
+    {
+        TaskService.OnChange -= HandleDataChange;
+    }
+}

@@ -1,0 +1,109 @@
+﻿@using MyGtdApp.Models
+@using System.Globalization
+
+<div class="modal-backdrop" @onclick="HandleClose">
+    <div class="modal-container" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <h3>Edit Task Details</h3>
+            <button class="close-btn" @onclick="HandleClose">×</button>
+        </div>
+
+        <div class="modal-body">
+            @if (_localTask != null)
+            {
+                <div class="form-group">
+                    <label for="title">Title</label>
+                    <input id="title" class="form-control" @bind="_localTask.Title" />
+                </div>
+
+                <div class="date-group">
+                    <div class="form-group">
+                        <label for="start-date">Start Date</label>
+                        <input id="start-date" type="date" class="form-control"
+                               value="@(_localTask.StartDate?.ToString("yyyy-MM-dd"))"
+                               @onchange="(ChangeEventArgs e) => _localTask.StartDate = !string.IsNullOrEmpty(e.Value?.ToString()) ? DateTime.Parse(e.Value.ToString()!) : null" />
+                    </div>
+                    <div class="form-group">
+                        <label for="due-date">Due Date</label>
+                        <input id="due-date" type="date" class="form-control"
+                               value="@(_localTask.DueDate?.ToString("yyyy-MM-dd"))"
+                               @onchange="(ChangeEventArgs e) => _localTask.DueDate = !string.IsNullOrEmpty(e.Value?.ToString()) ? DateTime.Parse(e.Value.ToString()!) : null" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="contexts">Contexts <small>(comma separated)</small></label>
+                    <input id="contexts" class="form-control" placeholder="e.g. @@Home, @@Work"
+                           @bind="ContextsString" />
+                </div>
+            }
+            else
+            {
+                <p>Loading...</p>
+            }
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn btn-secondary" @onclick="HandleClose">Cancel</button>
+            <button class="btn btn-primary" @onclick="HandleSave">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskItem TaskToEdit { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<TaskItem> OnSave { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private TaskItem? _localTask;
+
+    protected override void OnParametersSet()
+    {
+        _localTask = new TaskItem
+        {
+            Id = TaskToEdit.Id,
+            Title = TaskToEdit.Title,
+            Priority = TaskToEdit.Priority,
+            Status = TaskToEdit.Status,
+            ParentId = TaskToEdit.ParentId,
+            SortOrder = TaskToEdit.SortOrder,
+            IsCompleted = TaskToEdit.IsCompleted,
+            StartDate = TaskToEdit.StartDate,
+            DueDate = TaskToEdit.DueDate,
+            Contexts = new List<string>(TaskToEdit.Contexts)
+        };
+    }
+
+    private async Task HandleSave()
+    {
+        if (_localTask != null)
+        {
+            await OnSave.InvokeAsync(_localTask);
+        }
+    }
+
+    private async Task HandleClose()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private string ContextsString
+    {
+        get => _localTask != null ? string.Join(", ", _localTask.Contexts) : "";
+        set
+        {
+            if (_localTask != null)
+            {
+                _localTask.Contexts = string.IsNullOrWhiteSpace(value)
+                    ? new List<string>()
+                    : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            }
+        }
+    }
+}

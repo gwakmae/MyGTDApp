@@ -1,0 +1,156 @@
+﻿@using MyGtdApp.Models
+@using MyGtdApp.Services
+@using Microsoft.AspNetCore.Components.Web
+@inject ITaskService TaskService
+
+<div class="task-node @(DraggedTaskId == Task.Id ? "is-ghost" : "")">
+
+    <div class="task-node-self @DropIndicatorClass"
+         draggable="true"
+         @ondragstart="() => OnTaskDragStart.InvokeAsync(Task.Id)"
+         @ondragend="() => OnTaskDragEnd.InvokeAsync()"
+         @ondrop:stopPropagation="true" @ondrop="HandleDrop"
+         @ondragover:preventDefault="true" @ondragover:stopPropagation="true" @ondragover="HandleDragOver"
+         @ondragleave="() => dropIndicator = DropIndicator.None">
+
+        @if (Task.Children.Any())
+        {
+            <span class="expander" @onclick="ToggleExpand">@(isExpanded ? "▼" : "▶")</span>
+        }
+        else
+        {
+            <span class="expander-placeholder"></span>
+        }
+
+        <div class="task-card-wrapper">
+            <TaskCard Task="Task"
+                      OnTaskDeleted="() => OnTaskDeleted.InvokeAsync(Task.Id)"
+                      OnTaskCompletedToggle="() => OnTaskCompletedToggle.InvokeAsync(Task.Id)"
+                      OnTaskDoubleClick="() => OnTaskDoubleClick.InvokeAsync(Task.Id)" />
+        </div>
+        <button class="action-btn add-btn" @onclick="ToggleQuickAdd">+</button>
+    </div>
+
+    @if (isExpanded)
+    {
+        <div class="task-node-children">
+            @foreach (var child in Task.Children.OrderBy(c => c.SortOrder))
+            {
+                <ProjectTaskNode Task="child"
+                                 OnTaskAdded="OnTaskAdded"
+                                 OnTaskDeleted="OnTaskDeleted"
+                                 OnTaskUpdated="OnTaskUpdated"
+                                 OnTaskDragStart="OnTaskDragStart"
+                                 OnTaskDragEnd="OnTaskDragEnd"
+                                 OnTaskDropped="OnTaskDropped"
+                                 OnTaskCompletedToggle="OnTaskCompletedToggle"
+                                 OnTaskDoubleClick="OnTaskDoubleClick"
+                                 DraggedTaskId="DraggedTaskId" />
+            }
+
+            @if (isAddingChild)
+            {
+                <div class="quick-add-container child-add">
+                    <input @ref="quickAddInputRefForChild"
+                           @bind="newChildTaskTitle"
+                           @onkeyup="HandleChildQuickAddKeyUp"
+                           @onblur="() => isAddingChild = false"
+                           placeholder="Add a sub-task..."
+                           class="form-control" />
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    public enum DropIndicator { None, Above, Inside, Below }
+
+    [Parameter, EditorRequired]
+    public TaskItem Task { get; set; } = default!;
+
+    [Parameter] public int DraggedTaskId { get; set; }
+    [Parameter] public EventCallback OnTaskAdded { get; set; }
+    [Parameter] public EventCallback<int> OnTaskDeleted { get; set; }
+    [Parameter] public EventCallback OnTaskUpdated { get; set; }
+    [Parameter] public EventCallback<int> OnTaskDragStart { get; set; }
+    [Parameter] public EventCallback OnTaskDragEnd { get; set; }
+    [Parameter] public EventCallback<(int targetTaskId, DropIndicator position)> OnTaskDropped { get; set; }
+    [Parameter] public EventCallback<int> OnTaskCompletedToggle { get; set; }
+    [Parameter] public EventCallback<int> OnTaskDoubleClick { get; set; }
+
+    private bool isAddingChild = false;
+    private string newChildTaskTitle = "";
+    private ElementReference quickAddInputRefForChild;
+
+    private bool isExpanded = true;
+    private DropIndicator dropIndicator = DropIndicator.None;
+
+    private string DropIndicatorClass => dropIndicator switch
+    {
+        DropIndicator.Above => "drop-above",
+        DropIndicator.Inside => "drop-inside",
+        DropIndicator.Below => "drop-below",
+        _ => ""
+    };
+
+    private void ToggleExpand() => isExpanded = !isExpanded;
+
+    private async Task ToggleQuickAdd()
+    {
+        isAddingChild = !isAddingChild;
+        if (isAddingChild)
+        {
+            await System.Threading.Tasks.Task.Delay(50);
+            await quickAddInputRefForChild.FocusAsync();
+        }
+    }
+
+    private async Task HandleChildQuickAddKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(newChildTaskTitle))
+        {
+            await TaskService.AddTaskAsync(newChildTaskTitle, Task.Status, Task.Id);
+            newChildTaskTitle = "";
+            await OnTaskAdded.InvokeAsync();
+            await quickAddInputRefForChild.FocusAsync();
+        }
+        else if (e.Key == "Escape")
+        {
+            isAddingChild = false;
+        }
+    }
+
+    private void HandleDragOver(DragEventArgs e)
+    {
+        if (DraggedTaskId == Task.Id || IsDescendant(Task, DraggedTaskId))
+        {
+            dropIndicator = DropIndicator.None;
+            return;
+        }
+        const double elementHeight = 38.0;
+        var dropZoneHeight = elementHeight / 3.0;
+        if (e.OffsetY < dropZoneHeight) { dropIndicator = DropIndicator.Above; }
+        else if (e.OffsetY > elementHeight - dropZoneHeight) { dropIndicator = DropIndicator.Below; }
+        else { dropIndicator = DropIndicator.Inside; }
+    }
+
+    private async Task HandleDrop()
+    {
+        if (dropIndicator != DropIndicator.None)
+        {
+            await OnTaskDropped.InvokeAsync((Task.Id, dropIndicator));
+        }
+        dropIndicator = DropIndicator.None;
+    }
+
+    private bool IsDescendant(TaskItem parent, int childId)
+    {
+        foreach (var child in parent.Children)
+        {
+            if (child.Id == childId) return true;
+            if (IsDescendant(child, childId)) return true;
+        }
+        return false;
+    }
+}
