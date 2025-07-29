@@ -214,7 +214,7 @@ body {
     }
 
 /* ---------- � 이 부분을 파일 맨 아래에 새로 추가하세요 ---------- */
-@media (max-width: 767.98px) {
+@media (max-width: 991.98px) {
     /* 컨테이너의 padding을 줄여서 더 넓게 보이게 함 */
     .board-container, .context-view-container {
         padding: 0 1rem 1rem 1rem;
