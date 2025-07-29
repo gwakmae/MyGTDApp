@@ -7,7 +7,7 @@
 @using MyGtdApp.Components.Shared
 @using Microsoft.AspNetCore.Components.Web
 
-@using TaskStatus = MyGtdApp.Models.TaskStatus   @* ← 충돌 해결 *@
+@using TaskStatus = MyGtdApp.Models.TaskStatus @* ← 충돌 해결 *@
 @inject ITaskService TaskService
 
 @implements IDisposable
@@ -17,14 +17,12 @@
 
 @if (string.IsNullOrEmpty(Context))
 {
-    <!-- 기본 GTD 보드 --------------------------- -->
     <div class="main-header">
         <h1>My GTD Board</h1>
     </div>
 
     <div class="board-container @(draggedTaskId != 0 ? "is-dragging" : "")">
 
-        <!-- Today 컬럼 -->
         <div class="board-column today-column">
             <h3 class="column-header">Today</h3>
             <div class="task-list">
@@ -44,7 +42,6 @@
             </div>
         </div>
 
-        <!-- 나머지 컬럼 -->
         @foreach (var status in (TaskStatus[])Enum.GetValues(typeof(TaskStatus)))
         {
             <div class="board-column @(status == TaskStatus.Projects ? "project-column" : "") @GetColumnDropClass(status)"
@@ -92,9 +89,8 @@
 }
 else
 {
-    <!-- 컨텍스트 뷰 --------------------------- -->
     <div class="main-header">
-        <h1>Context: @Context</h1>   @* 중괄호 두 번 → 한 번 *@
+        <h1>Context: @Context</h1> @* 중괄호 두 번 → 한 번 *@
     </div>
 
     <div class="context-view-container">
@@ -296,5 +292,17 @@ else
     public void Dispose()
     {
         TaskService.OnChange -= HandleDataChanged;
+    }
+
+    [JSInvokable]
+    public async Task HandleDropOnProject(int targetTaskId, string position)
+    {
+        var pos = position switch
+        {
+            "Above" => ProjectTaskNode.DropIndicator.Above,
+            "Below" => ProjectTaskNode.DropIndicator.Below,
+            _ => ProjectTaskNode.DropIndicator.Inside
+        };
+        await HandleDropOnProject(targetTaskId, pos);
     }
 }

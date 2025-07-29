@@ -180,6 +180,11 @@ body {
     outline: 2px solid #007bff;
 }
 
+.task-node-self.drag-over {
+    background-color: #e9f2ff;
+    outline: 2px solid #007bff;
+}
+
 /* --- Task States (Checkbox, Completed, DueDate) --- */
 .task-checkbox {
     margin-right: 8px;

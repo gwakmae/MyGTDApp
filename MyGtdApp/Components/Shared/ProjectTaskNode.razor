@@ -7,6 +7,7 @@
 
     <div class="task-node-self @DropIndicatorClass"
          draggable="true"
+         data-task-id="@Task.Id"
          @ondragstart="() => OnTaskDragStart.InvokeAsync(Task.Id)"
          @ondragend="() => OnTaskDragEnd.InvokeAsync()"
          @ondrop:stopPropagation="true" @ondrop="HandleDrop"
