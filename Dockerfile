@@ -8,10 +8,10 @@ WORKDIR /src
 COPY . .
 
 # .sln 파일을 사용하여 모든 프로젝트의 종속성을 복원합니다.
-RUN dotnet restore "MyGtdApp.sln"
+RUN dotnet restore "MyGtdApp/MyGtdApp.csproj"
 
 # 릴리스 모드로 앱을 빌드하고 'out' 폴더에 발행(publish)합니다.
-RUN dotnet publish "MyGtdApp.sln" -c Release -o /app/publish
+RUN dotnet publish "MyGtdApp/MyGtdApp.csproj" -c Release -o /app/publish
 
 # 2단계: 빌드된 앱을 실행하는 환경 (가벼운 버전)
 # ASP.NET Core 런타임 이미지를 기반으로 시작합니다.
