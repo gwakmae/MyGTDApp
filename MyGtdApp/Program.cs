@@ -2,8 +2,14 @@
 using Microsoft.EntityFrameworkCore;
 using MyGtdApp.Components;
 using MyGtdApp.Services;
+using Microsoft.Extensions.Logging; // LogLevel을 사용하기 위해 추가
 
 var builder = WebApplication.CreateBuilder(args);
+
+// 👇 이 코드를 추가하세요
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.SetMinimumLevel(LogLevel.Information);
 
 /* ────────────────────────────────
  * 1) 연결 문자열 결정
@@ -23,6 +29,21 @@ builder.Services.AddRazorComponents()
        .AddInteractiveServerComponents();
 
 var app = builder.Build();
+
+// 👇 이 코드를 추가하세요
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<GtdDbContext>();
+    try
+    {
+        context.Database.EnsureCreated(); // 또는 context.Database.Migrate();
+    }
+    catch (Exception ex)
+    {
+        // 로그 출력 (배포 환경에서 확인 가능)
+        Console.WriteLine($"Database initialization failed: {ex.Message}");
+    }
+}
 
 /* ────────────────────────────────
  * 4) 미들웨어 파이프라인
