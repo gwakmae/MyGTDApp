@@ -1,18 +1,17 @@
 ﻿@page "/"
 @page "/context/{Context}"
+
 @rendermode InteractiveServer
 
 @using MyGtdApp.Models
 @using MyGtdApp.Services
 @using MyGtdApp.Components.Shared
 @using Microsoft.AspNetCore.Components.Web
+@using TaskStatus = MyGtdApp.Models.TaskStatus
 
-@using TaskStatus = MyGtdApp.Models.TaskStatus @* ← 충돌 해결 *@
 @inject ITaskService TaskService
-@inject IJSRuntime JSRuntime @* 👈 1. IJSRuntime 주입 *@
-
+@inject IJSRuntime JSRuntime
 @implements IDisposable
-@* IDisposable 인터페이스 구현 *@
 
 <PageTitle>@(string.IsNullOrEmpty(Context) ? "GTD Board" : $"Context: @{Context}")</PageTitle>
 
