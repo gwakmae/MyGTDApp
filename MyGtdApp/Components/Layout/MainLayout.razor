@@ -1,23 +1,19 @@
-﻿@inherits LayoutComponentBase
+﻿@using MyGtdApp.Components.Shared
+@inherits LayoutComponentBase
 
 <div class="page">
-    @* 사이드바: 모바일에서는 is-open 클래스로 제어 *@
     <div class="sidebar @(isSidebarOpen ? "is-open" : "")">
         <NavMenu />
     </div>
 
-    @* 모바일에서 사이드바가 열렸을 때 표시될 배경 레이어 *@
     @if (isSidebarOpen)
     {
         <div class="sidebar-backdrop is-open" @onclick="ToggleSidebar"></div>
     }
 
     <main>
-        @* 모바일용 헤더 (햄버거 버튼 포함) *@
         <div class="mobile-header">
-            <button class="sidebar-toggle-btn" @onclick="ToggleSidebar">
-                <span class="bi bi-list"></span>
-            </button>
+            <HamburgerButton OnToggle="ToggleSidebar" />
             <span class="mobile-header-title">GTD Board</span>
         </div>
 
@@ -33,5 +29,6 @@
     private void ToggleSidebar()
     {
         isSidebarOpen = !isSidebarOpen;
+        StateHasChanged();
     }
 }

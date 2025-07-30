@@ -38,24 +38,26 @@ main {
 /* ---------------------------------------------------- */
 /* ---------- 반응형 (모바일) 스타일 수정 ---------- */
 /* ---------------------------------------------------- */
-@media (max-width: 1199.98px) {
-    /* 사이드바를 화면 위에 띄우고 왼쪽 밖으로 숨김 */
+@media (max-width:1199.98px) {
+    /* 닫힌 상태 */
     .sidebar {
         position: fixed;
         top: 0;
         left: 0;
         bottom: 0;
-        z-index: 1050; /* 다른 요소들보다 위에 오도록 */
+        width: 250px;
         transform: translateX(-100%);
-        transition: transform 0.3s ease-in-out;
+        transition: transform .3s;
+        z-index: 1010; /* ⬅️  헤더보다 낮게 */
+        pointer-events: none; /* 클릭 차단 */
     }
-
-        /* is-open 클래스가 추가되면 화면 안으로 들어옴 */
+        /* 열린 상태 */
         .sidebar.is-open {
             transform: translateX(0);
+            z-index: 1060; /* ⬆️  헤더보다 높게 */
+            pointer-events: auto;
         }
 
-    /* 사이드바 뒤에 깔릴 어두운 배경 */
     .sidebar-backdrop {
         position: fixed;
         top: 0;
@@ -63,18 +65,18 @@ main {
         width: 100vw;
         height: 100vh;
         background-color: rgba(0, 0, 0, 0.5);
-        z-index: 1040; /* 사이드바보단 아래, 메인 콘텐츠보단 위 */
+        z-index: 1050;
         opacity: 0;
         transition: opacity 0.3s ease-in-out;
-        pointer-events: none; /* 기본적으로 클릭 안되게 */
+        pointer-events: none;
     }
 
         .sidebar-backdrop.is-open {
             opacity: 1;
-            pointer-events: auto; /* 열렸을 때만 클릭 가능하게 */
+            pointer-events: auto;
         }
 
-    /* 모바일에서는 mobile-header를 표시 */
+    /* 헤더는 항상 1040 */
     .mobile-header {
         display: flex;
         align-items: center;
@@ -82,11 +84,14 @@ main {
         padding: 0.75rem 1rem;
         border-bottom: 1px solid #e9ecef;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        /* ---------- 👇 이 두 줄을 새로 추가하세요 ---------- */
         position: relative;
-        z-index: 1030; /* 사이드바 배경(1040)보다는 낮고, 기본보다는 높게 */
+        z-index: 1040;
+        /* ✅ 추가 */
+        pointer-events: auto;
+        touch-action: manipulation;
     }
 
+    /* ✅ 햄버거 버튼 터치 최적화 추가 */
     .sidebar-toggle-btn {
         background: none;
         border: none;
@@ -95,7 +100,21 @@ main {
         padding: 0;
         margin-right: 1rem;
         line-height: 1;
+        cursor: pointer;
+        position: relative; /* ✅ 추가 */
+        z-index: 1070; /* ✅ 추가 - 가장 높은 우선순위 */
+        touch-action: manipulation; /* ✅ 추가 - 터치 최적화 */
+        -webkit-tap-highlight-color: transparent; /* ✅ 추가 - iOS 탭 하이라이트 제거 */
+        user-select: none; /* ✅ 추가 - 텍스트 선택 방지 */
+        /* ✅ 추가: JavaScript 이벤트 간섭 완전 차단 */
+        pointer-events: auto;
     }
+
+        /* ✅ 햄버거 버튼 활성 상태 피드백 추가 */
+        .sidebar-toggle-btn:active {
+            transform: scale(0.95);
+            opacity: 0.7;
+        }
 
     .mobile-header-title {
         font-size: 1.1rem;

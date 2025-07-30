@@ -1,0 +1,37 @@
+﻿/* ──────────────── 공통 설정 ──────────────── */
+.task-node-self {
+    position: relative; /* ::before/::after 기준 */
+    /* 필요하다면 기존 padding·border 등도 여기서 통일 */
+}
+
+    /* ──────────────── 드롭 인디케이터 ──────────────── */
+    /* 형제 앞(윗줄) */
+    .task-node-self.drop-above::before,
+    .task-node-self.drop-below::after { /* 공통 속성 묶음 */
+        content: '';
+        position: absolute;
+        left: -6px; /* 카드 너비보다 6px 늘림 */
+        right: -6px;
+        height: 3px; /* 선 두께 */
+        background: #3b82f6; /* 파랑 */
+        border-radius: 3px;
+        pointer-events: none; /* 이벤트 가로채지 않도록 */
+    }
+
+    .task-node-self.drop-above::before { /* 위쪽 라인 */
+        top: -3px; /* 패딩/보더 밖으로 3px */
+    }
+
+    .task-node-self.drop-below::after { /* 아래쪽 라인 */
+        bottom: -3px;
+    }
+
+    /* ──────────────── 하위 편입 / 드롭 불가 ──────────────── */
+    .task-node-self.drop-inside {
+        background: rgba(59,130,246,.15); /* 연파랑 배경 */
+    }
+
+    .task-node-self.drop-invalid {
+        cursor: not-allowed;
+        opacity: .4;
+    }

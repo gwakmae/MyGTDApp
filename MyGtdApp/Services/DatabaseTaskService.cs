@@ -71,18 +71,46 @@ namespace MyGtdApp.Services
             }
         }
 
+        // [수정] GetAllTasksAsync: 재귀형 트리 변환 방식으로 전체 변경
         public async Task<List<TaskItem>> GetAllTasksAsync()
         {
             using var context = _dbContextFactory.CreateDbContext();
-            var allTasks = await context.Tasks.Include(t => t.Children).ToListAsync();
-            var topLevelTasks = allTasks.Where(t => t.ParentId == null)
+
+            // 1) 모든 Task 를 한 번에 가져온다
+            var allTasks = await context.Tasks
+                                         .AsNoTracking()    // 트래킹 안 해도 OK
                                          .OrderBy(t => t.SortOrder)
-                                         .ToList();
-            foreach (var task in topLevelTasks)
+                                         .ToListAsync();
+
+            // 2) 빠른 참조용 딕셔너리
+            var lookup = allTasks.ToDictionary(t => t.Id);
+
+            // 3) Children 컬렉션 초기화
+            foreach (var t in allTasks) t.Children = new();
+
+            // 4) 부모-자식 연결
+            foreach (var t in allTasks)
             {
-                task.Children = allTasks.Where(t => t.ParentId == task.Id).OrderBy(t => t.SortOrder).ToList();
+                if (t.ParentId.HasValue && lookup.TryGetValue(t.ParentId.Value, out var parent))
+                {
+                    parent.Children.Add(t);
+                }
             }
-            return topLevelTasks;
+
+            // 5) 정렬 & 재귀로 하위까지 정리
+            void SortRecursive(TaskItem node)
+            {
+                node.Children = node.Children.OrderBy(c => c.SortOrder).ToList();
+                foreach (var c in node.Children) SortRecursive(c);
+            }
+
+            var topLevel = allTasks.Where(t => t.ParentId == null)
+                                   .OrderBy(t => t.SortOrder)
+                                   .ToList();
+
+            foreach (var root in topLevel) SortRecursive(root);
+
+            return topLevel;
         }
 
         public async Task<List<string>> GetAllContextsAsync()
@@ -94,10 +122,10 @@ namespace MyGtdApp.Services
 
             // 2. 메모리로 가져온 데이터를 C# 코드로 가공합니다. (복잡한 작업)
             var allContexts = allTasks
-                                     .SelectMany(t => t.Contexts)
-                                     .Distinct()
-                                     .OrderBy(c => c)
-                                     .ToList(); // 이미 메모리에 있으므로 ToList() 사용
+                                           .SelectMany(t => t.Contexts)
+                                           .Distinct()
+                                           .OrderBy(c => c)
+                                           .ToList(); // 이미 메모리에 있으므로 ToList() 사용
 
             return allContexts;
         }
@@ -125,28 +153,73 @@ namespace MyGtdApp.Services
              .ToListAsync();
         }
 
-        public async Task MoveTaskAsync(int taskId, Models.TaskStatus newStatus, int? newParentId, int newSortOrder)
+        public async Task MoveTaskAsync(
+            int taskId,
+            TaskStatus newStatus,
+            int? newParentId,
+            int newSortOrder)
         {
             using var context = _dbContextFactory.CreateDbContext();
+
             var taskToMove = await context.Tasks.FindAsync(taskId);
-            if (taskToMove != null)
+            if (taskToMove == null) return;
+
+            /* ---------- 순환 방지 로직 추가 시작 ---------- */
+            if (newParentId != null)
             {
-                var oldStatus = taskToMove.Status;
+                int cursorId = newParentId.Value;
+                while (true)
+                {
+                    if (cursorId == taskId)
+                    {
+                        // 자기 자손에게 넣으려는 시도 → 무시하고 그냥 리턴
+                        return;
+                    }
 
-                var oldSiblings = await context.Tasks.Where(t => t.ParentId == taskToMove.ParentId && t.Status == oldStatus && t.Id != taskId).OrderBy(t => t.SortOrder).ToListAsync();
-                for (int i = 0; i < oldSiblings.Count; i++) { oldSiblings[i].SortOrder = i; }
+                    var parentInfo = await context.Tasks
+                                                     .AsNoTracking()
+                                                     .Where(t => t.Id == cursorId)
+                                                     .Select(t => new { t.ParentId })
+                                                     .FirstOrDefaultAsync();
 
-                taskToMove.ParentId = newParentId;
-                taskToMove.Status = newStatus;
-
-                var newSiblings = await context.Tasks.Where(t => t.ParentId == newParentId && t.Status == newStatus && t.Id != taskId).OrderBy(t => t.SortOrder).ToListAsync();
-                newSortOrder = System.Math.Clamp(newSortOrder, 0, newSiblings.Count);
-                newSiblings.Insert(newSortOrder, taskToMove);
-                for (int i = 0; i < newSiblings.Count; i++) { newSiblings[i].SortOrder = i; }
-
-                await context.SaveChangesAsync();
-                NotifyStateChanged();
+                    if (parentInfo?.ParentId == null) break; // 더 올라갈 부모 없음
+                    cursorId = parentInfo.ParentId.Value;    // 한 단계 위로
+                }
             }
+            /* ---------- 순환 방지 로직 추가 끝 ---------- */
+
+            var oldStatus = taskToMove.Status;
+
+            // 원래 형제들의 SortOrder 재정렬
+            var oldSiblings = await context.Tasks
+                .Where(t => t.ParentId == taskToMove.ParentId
+                         && t.Status == oldStatus
+                         && t.Id != taskId)
+                .OrderBy(t => t.SortOrder)
+                .ToListAsync();
+            for (int i = 0; i < oldSiblings.Count; i++)
+                oldSiblings[i].SortOrder = i;
+
+            // 이동
+            taskToMove.ParentId = newParentId;
+            taskToMove.Status = newStatus;
+
+            // 새 위치 형제들 + 자기 자신 정렬
+            var newSiblings = await context.Tasks
+                .Where(t => t.ParentId == newParentId
+                         && t.Status == newStatus
+                         && t.Id != taskId)
+                .OrderBy(t => t.SortOrder)
+                .ToListAsync();
+
+            newSortOrder = System.Math.Clamp(newSortOrder, 0, newSiblings.Count);
+            newSiblings.Insert(newSortOrder, taskToMove);
+
+            for (int i = 0; i < newSiblings.Count; i++)
+                newSiblings[i].SortOrder = i;
+
+            await context.SaveChangesAsync();
+            NotifyStateChanged();
         }
 
         public async Task ToggleCompleteStatusAsync(int taskId)

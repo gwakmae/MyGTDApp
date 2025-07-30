@@ -5,14 +5,14 @@
 
 <div class="task-node @(DraggedTaskId == Task.Id ? "is-ghost" : "")">
 
-    <div class="task-node-self @DropIndicatorClass"
+    <div class="task-node-self @DropIndicatorClass @InvalidClass"
          draggable="true"
          data-task-id="@Task.Id"
          @ondragstart="() => OnTaskDragStart.InvokeAsync(Task.Id)"
          @ondragend="() => OnTaskDragEnd.InvokeAsync()"
          @ondrop:stopPropagation="true" @ondrop="HandleDrop"
          @ondragover:preventDefault="true" @ondragover:stopPropagation="true" @ondragover="HandleDragOver"
-         @ondragleave="() => dropIndicator = DropIndicator.None">
+         @ondragleave="() => { dropIndicator = DropIndicator.None; dropInvalid = false; }">
 
         @if (Task.Children.Any())
         {
@@ -55,7 +55,7 @@
                     <input @ref="quickAddInputRefForChild"
                            @bind="newChildTaskTitle"
                            @onkeyup="HandleChildQuickAddKeyUp"
-                           @onblur="() => isAddingChild = false"
+                           @onblur="HandleChildQuickAddBlur"
                            placeholder="Add a sub-task..."
                            class="form-control" />
                 </div>
@@ -65,12 +65,13 @@
 </div>
 
 @code {
+    /*------------- enum -------------*/
     public enum DropIndicator { None, Above, Inside, Below }
 
-    [Parameter, EditorRequired]
-    public TaskItem Task { get; set; } = default!;
-
+    /*------------- Parameters -------------*/
+    [Parameter, EditorRequired] public TaskItem Task { get; set; } = default!;
     [Parameter] public int DraggedTaskId { get; set; }
+
     [Parameter] public EventCallback OnTaskAdded { get; set; }
     [Parameter] public EventCallback<int> OnTaskDeleted { get; set; }
     [Parameter] public EventCallback OnTaskUpdated { get; set; }
@@ -80,13 +81,17 @@
     [Parameter] public EventCallback<int> OnTaskCompletedToggle { get; set; }
     [Parameter] public EventCallback<int> OnTaskDoubleClick { get; set; }
 
+    /*------------- UI 상태 -------------*/
+    private bool isExpanded = true;
     private bool isAddingChild = false;
     private string newChildTaskTitle = "";
     private ElementReference quickAddInputRefForChild;
 
-    private bool isExpanded = true;
+    /* 드롭 위치 · 유효성 */
     private DropIndicator dropIndicator = DropIndicator.None;
+    private bool dropInvalid = false;   // ⬅ 드롭 불가 여부
 
+    /*------------- CSS 클래스 계산 -------------*/
     private string DropIndicatorClass => dropIndicator switch
     {
         DropIndicator.Above => "drop-above",
@@ -94,7 +99,9 @@
         DropIndicator.Below => "drop-below",
         _ => ""
     };
+    private string InvalidClass => dropInvalid ? "drop-invalid" : "";
 
+    /*------------- 토글/추가 -------------*/
     private void ToggleExpand() => isExpanded = !isExpanded;
 
     private async Task ToggleQuickAdd()
@@ -122,29 +129,62 @@
         }
     }
 
+    // 수정: HandleChildQuickAddBlur 메서드 추가 및 기존 @onblur 변경
+    private async Task HandleChildQuickAddBlur()
+    {
+        // 입력된 내용이 있으면 자동으로 저장
+        if (!string.IsNullOrWhiteSpace(newChildTaskTitle))
+        {
+            await TaskService.AddTaskAsync(newChildTaskTitle, Task.Status, Task.Id);
+            await OnTaskAdded.InvokeAsync();
+        }
+
+        // 상태 초기화
+        isAddingChild = false;
+        newChildTaskTitle = "";
+    }
+
+    /*------------- D&D 로직 -------------*/
     private void HandleDragOver(DragEventArgs e)
     {
+        /* 자기 자신 또는 자손에게 드롭하려는 경우 → 차단 + 불가 표시 */
         if (DraggedTaskId == Task.Id || IsDescendant(Task, DraggedTaskId))
         {
+            dropInvalid = true;
             dropIndicator = DropIndicator.None;
             return;
         }
+
+        dropInvalid = false;
+
         const double elementHeight = 38.0;
-        var dropZoneHeight = elementHeight / 3.0;
-        if (e.OffsetY < dropZoneHeight) { dropIndicator = DropIndicator.Above; }
-        else if (e.OffsetY > elementHeight - dropZoneHeight) { dropIndicator = DropIndicator.Below; }
-        else { dropIndicator = DropIndicator.Inside; }
+        var zone = elementHeight / 3.0;
+
+        if (e.OffsetY < zone) dropIndicator = DropIndicator.Above;
+        else if (e.OffsetY > elementHeight - zone) dropIndicator = DropIndicator.Below;
+        else dropIndicator = DropIndicator.Inside;
     }
 
     private async Task HandleDrop()
     {
+        /* 최종 방어막 – 순환 드롭 차단 */
+        if (DraggedTaskId == Task.Id || IsDescendant(Task, DraggedTaskId))
+        {
+            dropIndicator = DropIndicator.None;
+            dropInvalid = false;
+            return;
+        }
+
         if (dropIndicator != DropIndicator.None)
         {
             await OnTaskDropped.InvokeAsync((Task.Id, dropIndicator));
         }
+
         dropIndicator = DropIndicator.None;
+        dropInvalid = false;
     }
 
+    /* parent 가 childId 를 자손으로 가지고 있는지 재귀 확인 */
     private bool IsDescendant(TaskItem parent, int childId)
     {
         foreach (var child in parent.Children)

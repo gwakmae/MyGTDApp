@@ -1,0 +1,42 @@
+﻿@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+
+<button class="sidebar-toggle-btn" @onclick="HandleToggle" @onclick:preventDefault="true">
+    <span class="bi bi-list"></span>
+</button>
+
+@code {
+    [Parameter] public EventCallback OnToggle { get; set; }
+
+    private async Task HandleToggle()
+    {
+        // JavaScript로 직접 DOM 조작
+        await JSRuntime.InvokeVoidAsync("eval", @"
+            const sidebar = document.querySelector('.sidebar');
+            const backdrop = document.querySelector('.sidebar-backdrop');
+
+            if (sidebar.classList.contains('is-open')) {
+                // 사이드바 닫기
+                sidebar.classList.remove('is-open');
+                if (backdrop) backdrop.remove();
+            } else {
+                // 사이드바 열기
+                sidebar.classList.add('is-open');
+
+                // backdrop 추가
+                if (!backdrop) {
+                    const newBackdrop = document.createElement('div');
+                    newBackdrop.className = 'sidebar-backdrop is-open';
+                    newBackdrop.addEventListener('click', function() {
+                        sidebar.classList.remove('is-open');
+                        newBackdrop.remove();
+                    });
+                    document.querySelector('.page').appendChild(newBackdrop);
+                }
+            }
+        ");
+
+        // 부모에게도 알림 (상태 동기화용)
+        await OnToggle.InvokeAsync();
+    }
+}

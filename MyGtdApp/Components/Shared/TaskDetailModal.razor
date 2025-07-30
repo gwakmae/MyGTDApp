@@ -12,31 +12,41 @@
         <div class="modal-body">
             @if (_localTask != null)
             {
-                <div class="form-group">
-                    <label for="title">Title</label>
-                    <input id="title" class="form-control" @bind="_localTask.Title" />
-                </div>
-
-                <div class="date-group">
+                <form @onsubmit="HandleFormSubmit" @onsubmit:preventDefault="true">
                     <div class="form-group">
-                        <label for="start-date">Start Date</label>
-                        <input id="start-date" type="date" class="form-control"
-                               value="@(_localTask.StartDate?.ToString("yyyy-MM-dd"))"
-                               @onchange="(ChangeEventArgs e) => _localTask.StartDate = !string.IsNullOrEmpty(e.Value?.ToString()) ? DateTime.Parse(e.Value.ToString()!) : null" />
+                        <label for="title">Title</label>
+                        <input id="title"
+                               class="form-control"
+                               @bind="_localTask.Title"
+                               @onkeyup="HandleKeyUp" />
                     </div>
-                    <div class="form-group">
-                        <label for="due-date">Due Date</label>
-                        <input id="due-date" type="date" class="form-control"
-                               value="@(_localTask.DueDate?.ToString("yyyy-MM-dd"))"
-                               @onchange="(ChangeEventArgs e) => _localTask.DueDate = !string.IsNullOrEmpty(e.Value?.ToString()) ? DateTime.Parse(e.Value.ToString()!) : null" />
-                    </div>
-                </div>
 
-                <div class="form-group">
-                    <label for="contexts">Contexts <small>(comma separated)</small></label>
-                    <input id="contexts" class="form-control" placeholder="e.g. @@Home, @@Work"
-                           @bind="ContextsString" />
-                </div>
+                    <div class="date-group">
+                        <div class="form-group">
+                            <label for="start-date">Start Date</label>
+                            <input id="start-date" type="date" class="form-control"
+                                   value="@(_localTask.StartDate?.ToString("yyyy-MM-dd"))"
+                                   @onchange="(ChangeEventArgs e) => _localTask.StartDate = !string.IsNullOrEmpty(e.Value?.ToString()) ? DateTime.Parse(e.Value.ToString()!) : null" />
+                        </div>
+                        <div class="form-group">
+                            <label for="due-date">Due Date</label>
+                            <input id="due-date" type="date" class="form-control"
+                                   value="@(_localTask.DueDate?.ToString("yyyy-MM-dd"))"
+                                   @onchange="(ChangeEventArgs e) => _localTask.DueDate = !string.IsNullOrEmpty(e.Value?.ToString()) ? DateTime.Parse(e.Value.ToString()!) : null" />
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="contexts">Contexts <small>(comma separated)</small></label>
+                        <input id="contexts"
+                               class="form-control"
+                               placeholder="e.g. @@Home, @@Work"
+                               @bind="ContextsString"
+                               @onkeyup="HandleKeyUp" />
+                    </div>
+
+                    <button type="submit" style="display: none;"></button>
+                </form>
             }
             else
             {
@@ -78,6 +88,21 @@
             DueDate = TaskToEdit.DueDate,
             Contexts = new List<string>(TaskToEdit.Contexts)
         };
+    }
+
+    // 엔터키 처리 메서드 추가
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await HandleSave();
+        }
+    }
+
+    // form submit 처리 메서드 추가
+    private async Task HandleFormSubmit()
+    {
+        await HandleSave();
     }
 
     private async Task HandleSave()

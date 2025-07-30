@@ -11,7 +11,7 @@
 
 @inject ITaskService TaskService
 @inject IJSRuntime JSRuntime
-@implements IDisposable
+@implements IAsyncDisposable
 
 <PageTitle>@(string.IsNullOrEmpty(Context) ? "GTD Board" : $"Context: @{Context}")</PageTitle>
 
@@ -74,7 +74,7 @@
                         <input @ref="quickAddInputRef"
                                @bind="newTaskTitle"
                                @onkeyup="(e) => HandleQuickAddKeyUp(e, status)"
-                               @onblur="CancelQuickAdd"
+                               @onblur="() => HandleQuickAddBlur(status)"
                                placeholder="Enter a title..."
                                class="form-control" />
                     </div>
@@ -135,19 +135,23 @@ else
     private string newTaskTitle = string.Empty;
     private ElementReference quickAddInputRef;
 
-    private DotNetObjectReference<Home>? dotNetHelper; @* 👈 2. JS와 통신할 객체 참조 선언 *@
+    private IJSObjectReference? module; // JS 모듈을 참조할 객체
+    private DotNetObjectReference<Home>? dotNetHelper;
 
     /* ----------------- 생명주기 ------------------ */
 
-    protected override async Task OnAfterRenderAsync(bool firstRender) @* 👇 3. OnAfterRenderAsync 생명주기 메서드 추가 *@
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // 컴포넌트가 처음 렌더링된 후에만 실행
         if (firstRender)
         {
-            // dotNetHelper 객체를 초기화하고, 이 컴포넌트(this)를 참조하도록 설정
+            // 1. JS 모듈을 안전하게 import하고 참조를 'module' 변수에 저장합니다.
+            module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/gtd-board.js");
+
+            // 2. C# <-> JS 통신을 위한 헬퍼 객체를 만듭니다.
             dotNetHelper = DotNetObjectReference.Create(this);
-            // JS의 setup` 함수를 호출하면서, 이 helper 객체를 전달
-            await JSRuntime.InvokeVoidAsync("setup", dotNetHelper);
+
+            // 3. import한 모듈 안에 있는 'setup' 함수를 호출합니다.
+            await module.InvokeVoidAsync("setup", dotNetHelper);
         }
     }
 
@@ -268,6 +272,20 @@ else
         }
     }
 
+    // [수정] HandleQuickAddBlur 메서드 추가
+    private async Task HandleQuickAddBlur(TaskStatus status)
+    {
+        // 입력된 내용이 있으면 자동으로 저장
+        if (!string.IsNullOrWhiteSpace(newTaskTitle))
+        {
+            await TaskService.AddTaskAsync(newTaskTitle, status, null);
+        }
+
+        // 상태 초기화
+        addingTaskStatus = null;
+        newTaskTitle = "";
+    }
+
     /* -------------- CRUD 핸들러 ---------------- */
     private Task HandleTaskAdded() => Task.CompletedTask;
     private Task HandleUpdateTask() => Task.CompletedTask;
@@ -303,15 +321,29 @@ else
         await InvokeAsync(StateHasChanged);
     }
 
-    /* -------------- IDisposable --------------- */
-    public void Dispose()
+    /* -------------- IAsyncDisposable --------------- */
+    public async ValueTask DisposeAsync()
     {
         TaskService.OnChange -= HandleDataChanged;
-        @* 👇 4. 컴포넌트가 소멸될 때 JS 참조도 함께 해제 (메모리 누수 방지) *@
         dotNetHelper?.Dispose();
+
+        if (module is not null)
+        {
+            try
+            {
+                // 회로가 아직 살아있을 때만 정상적으로 실행됨
+                await module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // 회로가 이미 끊겼다면 이 예외가 발생하지만,
+                // 정상적인 종료 과정이므로 아무것도 할 필요가 없음.
+                // 그냥 조용히 무시하고 넘어갑니다.
+            }
+        }
     }
 
-    [JSInvokable] @* 👇 5. JS에서 호출할 메서드라는 것을 명확히 표시 (기존과 동일하지만 중요) *@
+    [JSInvokable]
     public async Task HandleDropOnProject(int targetTaskId, string position)
     {
         var pos = position switch

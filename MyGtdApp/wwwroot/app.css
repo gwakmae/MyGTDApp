@@ -113,7 +113,7 @@ body {
 }
 
 .task-node-children {
-    padding-left: 12px;
+    padding-left: 0px;
     border-left: 2px solid #dfe1e6;
     margin-left: 12px;
     display: flex;
@@ -268,4 +268,20 @@ body {
     .main-header {
         padding: 0 1rem 1rem 1rem;
     }
+}
+
+/* ------------------------------------------------------------ */
+/* --- 계층 트리 정렬 보정 ------------------------------------ */
+/* ------------------------------------------------------------ */
+.expander,
+.expander-placeholder {
+    flex: 0 0 24px; /* 항상 24px 공간 확보 & 줄어들지 않음   */
+    display: flex; /* 가운데 정렬을 위해 flex 사용           */
+    justify-content: center;
+    align-items: center;
+}
+
+.expander {
+    font-size: 0.9rem; /* 아이콘 정렬 미세 보정 (선택 사항)      */
+    line-height: 1;
 }
