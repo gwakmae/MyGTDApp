@@ -20,9 +20,14 @@ string? connectionString =
     ?? throw new InvalidOperationException("PostgreSQL 연결 문자열을 찾을 수 없습니다.");
 
 /* ────────────────────────────────
- * 2) 서비스 등록
+ * 2) 서비스 등록 (수정)
  * ──────────────────────────────── */
-builder.Services.AddDbContext<GtdDbContext>(opt => opt.UseNpgsql(connectionString));
+// [변경 전]
+// builder.Services.AddDbContext<GtdDbContext>(opt => opt.UseNpgsql(connectionString));
+
+// [변경 후] 👇 IDbContextFactory를 등록합니다.
+builder.Services.AddDbContextFactory<GtdDbContext>(opt => opt.UseNpgsql(connectionString));
+
 builder.Services.AddScoped<ITaskService, DatabaseTaskService>();
 
 builder.Services.AddRazorComponents()
