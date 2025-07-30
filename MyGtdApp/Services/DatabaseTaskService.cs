@@ -76,8 +76,8 @@ namespace MyGtdApp.Services
             using var context = _dbContextFactory.CreateDbContext();
             var allTasks = await context.Tasks.Include(t => t.Children).ToListAsync();
             var topLevelTasks = allTasks.Where(t => t.ParentId == null)
-                                        .OrderBy(t => t.SortOrder)
-                                        .ToList();
+                                         .OrderBy(t => t.SortOrder)
+                                         .ToList();
             foreach (var task in topLevelTasks)
             {
                 task.Children = allTasks.Where(t => t.ParentId == task.Id).OrderBy(t => t.SortOrder).ToList();
@@ -88,11 +88,17 @@ namespace MyGtdApp.Services
         public async Task<List<string>> GetAllContextsAsync()
         {
             using var context = _dbContextFactory.CreateDbContext();
-            var allContexts = await context.Tasks
+
+            // 1. 먼저 DB에서 모든 Task를 메모리로 가져옵니다. (단순한 요청)
+            var allTasks = await context.Tasks.ToListAsync();
+
+            // 2. 메모리로 가져온 데이터를 C# 코드로 가공합니다. (복잡한 작업)
+            var allContexts = allTasks
                                      .SelectMany(t => t.Contexts)
                                      .Distinct()
                                      .OrderBy(c => c)
-                                     .ToListAsync();
+                                     .ToList(); // 이미 메모리에 있으므로 ToList() 사용
+
             return allContexts;
         }
 
