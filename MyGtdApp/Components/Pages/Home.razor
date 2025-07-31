@@ -19,9 +19,11 @@
 {
     <div class="main-header">
         <h1>My GTD Board</h1>
-        <DataManager />
-        <!-- ✅ Hide / Show 버튼 -->
-        <button class="btn btn-outline-secondary ms-3"
+
+        @* ① board-header 전용 클래스 추가 *@
+        <DataManager class="data-manager board-header" />
+
+        <button class="btn btn-outline-secondary ms-auto ms-xl-3"
                 title="Hide / Show completed tasks"
                 @onclick="() => hideCompleted = !hideCompleted">
             <i class="bi @(hideCompleted ? "bi-eye-slash" : "bi-eye")"></i>
@@ -102,7 +104,7 @@ else
     <div class="main-header">
         <h1>Context: @Context</h1>
         <!-- ✅ Hide / Show 버튼 -->
-        <button class="btn btn-outline-secondary ms-3"
+        <button class="btn btn-outline-secondary ms-auto ms-xl-3"
                 title="Hide / Show completed tasks"
                 @onclick="() => hideCompleted = !hideCompleted">
             <i class="bi @(hideCompleted ? "bi-eye-slash" : "bi-eye")"></i>

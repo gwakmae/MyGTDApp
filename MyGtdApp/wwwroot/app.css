@@ -9,6 +9,10 @@ body {
 /* --- Page Header & Container Styles --- */
 .main-header {
     padding: 0 2rem 1rem 2rem;
+    display: flex; /* 세로 중앙 */
+    align-items: center;
+    flex-wrap: wrap; /* 폭이 좁으면 줄바꿈 */
+    gap: .75rem; /* 기본 간격 */
 }
 
     .main-header h1 {
@@ -16,13 +20,14 @@ body {
         margin: 0;
     }
 
-.board-container, .context-view-container {
+.board-container,
+.context-view-container {
     display: flex;
     gap: 1rem;
     padding: 0 2rem 1rem 2rem;
     overflow-x: auto;
     align-items: flex-start;
-    flex: 1; /* <--- 👇 이 한 줄을 추가하세요 */
+    flex: 1;
 }
 
     .board-container.is-dragging {
@@ -113,7 +118,7 @@ body {
 }
 
 .task-node-children {
-    padding-left: 0px;
+    padding-left: 0;
     border-left: 2px solid #dfe1e6;
     margin-left: 12px;
     display: flex;
@@ -219,14 +224,13 @@ body {
     }
 
 /* ======================================================= */
-/* ============== 반응형 레이아웃 재설계 ============== */
+/* ==============  Responsive Layout  ==================== */
 /* ======================================================= */
 
-/* --- 1. 일반 모바일 (너비 767px 이하) --- */
-/* - 모든 컬럼을 세로로 쌓습니다.
-/* ------------------------------------------------------- */
+/* --- 1. Mobile ≤ 767px --------------------------------- */
 @media (max-width: 767.98px) {
-    .board-container, .context-view-container {
+    .board-container,
+    .context-view-container {
         padding: 0 1rem 1rem 1rem;
         flex-direction: column;
         overflow-x: hidden;
@@ -242,26 +246,16 @@ body {
     }
 }
 
-/* --- 2. 태블릿 & 폴더블 (너비 768px 이상, 1199px 이하) --- */
-/* - 화면 너비에 따라 컬럼이 자동으로 줄바꿈(wrap) 됩니다.
-/* - 폴드5를 펼치면 2~3개의 컬럼이 보기 좋게 배치됩니다.
-/* ------------------------------------------------------------ */
+/* --- 2. Tablet / Foldable 768–1199px -------------------- */
 @media (min-width: 768px) and (max-width: 1199.98px) {
     .board-container {
-        /* 컬럼들이 다음 줄로 넘어갈 수 있도록 허용 */
-        flex-wrap: wrap;
-        /* 가로 스크롤 대신 전체 스크롤을 사용하도록 변경 */
+        flex-wrap: wrap; /* 줄바꿈 허용 */
         overflow-x: hidden;
         padding: 0 1rem 1rem 1rem;
     }
 
     .board-column {
-        /* * flex-grow: 1 -> 남는 공간이 있으면 채움
-         * flex-shrink: 1 -> 공간이 부족하면 줄어듦
-         * flex-basis: 300px -> 기본 너비는 300px을 유지하려고 함
-         */
         flex: 1 1 300px;
-        /* 컬럼이 너무 좁아지지 않도록 최소 너비 설정 */
         min-width: 280px;
     }
 
@@ -270,18 +264,59 @@ body {
     }
 }
 
+/* --- 3. Desktop ≥ 1200px --------------------------------
+ *     (⚠ 이 블록은 나중에 다시 덮어쓰므로 그대로 둬도 무방)
+ * ------------------------------------------------------- */
+@media (min-width: 1200px) {
+
+    .main-header .data-manager.board-header {
+        display: flex !important; /* d-xl-block → flex 덮어쓰기 */
+        align-items: center;
+        gap: .5rem;
+        padding: 0;
+    }
+
+        .main-header .data-manager.board-header h4 {
+            display: none;
+        }
+}
+
 /* ------------------------------------------------------------ */
-/* --- 계층 트리 정렬 보정 ------------------------------------ */
+/* ---  Tree alignment tweaks --------------------------------- */
 /* ------------------------------------------------------------ */
 .expander,
 .expander-placeholder {
-    flex: 0 0 24px; /* 항상 24px 공간 확보 & 줄어들지 않음   */
-    display: flex; /* 가운데 정렬을 위해 flex 사용           */
+    flex: 0 0 24px;
+    display: flex;
     justify-content: center;
     align-items: center;
 }
 
 .expander {
-    font-size: 0.9rem; /* 아이콘 정렬 미세 보정 (선택 사항)      */
+    font-size: 0.9rem;
     line-height: 1;
+}
+
+/* ===================================================================== */
+/*                         board-header 표시 제어                         */
+/* ===================================================================== */
+
+/* 기본값 : 모든 뷰포트에서 숨김 */
+.main-header .data-manager.board-header {
+    display: none !important;
+}
+
+/* 데스크톱(1200px↑)에서만 다시 노출 */
+@media (min-width: 1200px) {
+    .main-header .data-manager.board-header {
+        display: flex !important;
+        align-items: center;
+        gap: .5rem;
+        padding: 0;
+    }
+
+        /* board-header 안의 제목(h4)은 데스크톱에서도 숨김 */
+        .main-header .data-manager.board-header h4 {
+            display: none;
+        }
 }
