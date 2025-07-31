@@ -35,6 +35,11 @@
         /// 컨텍스트 태그 목록 (예: "@Home", "@Work")
         /// </summary>
         public List<string> Contexts { get; set; } = new();
+
+        /// <summary>
+        /// 트리 노드 확장/축소 상태 (기본값: true - 펼침)
+        /// </summary>
+        public bool IsExpanded { get; set; } = true;
     }
 
     // --- TaskStatus Enum 수정 ---

@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Text.Json; // 추가됨
+using System.Text.Json.Serialization; // 추가됨
 
 namespace MyGtdApp.Services
 {
@@ -160,11 +162,70 @@ namespace MyGtdApp.Services
         public Task<List<TaskItem>> GetTasksByContextAsync(string context)
         {
             var result = _tasks
-                .Where(t => !t.IsCompleted && t.Contexts.Contains(context, StringComparer.OrdinalIgnoreCase)) // Modified line
+                .Where(t => !t.IsCompleted && t.Contexts.Contains(context, StringComparer.OrdinalIgnoreCase))
                 .OrderBy(t => t.Status)
                 .ThenBy(t => t.SortOrder)
                 .ToList();
             return Task.FromResult(result);
         }
+
+        // 추가됨: 데이터 내보내기 메서드
+        public Task<string> ExportTasksToJsonAsync()
+        {
+            var exportData = new { tasks = _tasks };
+
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                Converters = { new JsonStringEnumConverter() }
+            };
+
+            var json = JsonSerializer.Serialize(exportData, options);
+            return Task.FromResult(json);
+        }
+
+        // 추가됨: 데이터 가져오기 메서드
+        public Task ImportTasksFromJsonAsync(string jsonData)
+        {
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter() }
+            };
+
+            var importData = JsonSerializer.Deserialize<JsonTaskHelper>(jsonData, options);
+
+            if (importData?.Tasks != null && importData.Tasks.Any())
+            {
+                _tasks.Clear();
+                _tasks.AddRange(importData.Tasks);
+
+                if (_tasks.Any())
+                {
+                    _nextId = _tasks.Max(t => t.Id) + 1;
+                }
+
+                NotifyStateChanged();
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task UpdateTaskExpandStateAsync(int taskId, bool isExpanded)
+        {
+            var task = _tasks.FirstOrDefault(t => t.Id == taskId);
+            if (task != null)
+            {
+                task.IsExpanded = isExpanded;
+            }
+            return Task.CompletedTask;
+        }
     }
+
+    // 🚫 이 부분을 완전히 제거하세요
+    // internal class JsonTaskHelper
+    // {
+    //     public List<TaskItem>? Tasks { get; set; }
+    // }
 }

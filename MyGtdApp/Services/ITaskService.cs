@@ -19,5 +19,12 @@ namespace MyGtdApp.Services
         Task<List<TaskItem>> GetTodayTasksAsync();
         Task<List<string>> GetAllContextsAsync();
         Task<List<TaskItem>> GetTasksByContextAsync(string context);
+
+        // 🆕 데이터 백업/복원 메서드 추가
+        Task<string> ExportTasksToJsonAsync();
+        Task ImportTasksFromJsonAsync(string jsonData);
+
+        // 🆕 트리 노드 확장/축소 상태 업데이트 추가
+        Task UpdateTaskExpandStateAsync(int taskId, bool isExpanded);
     }
 }

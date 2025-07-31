@@ -1,0 +1,115 @@
+﻿@page "/data-manager"
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Text.Json
+
+<!-- ① XL( ≥ 1 200px )에서만 보여주기 -->
+<div class="data-manager d-none d-xl-block">
+    <h4>데이터 관리</h4>
+
+    <div class="action-buttons">
+        <!-- 데이터 내보내기 -->
+        <button class="btn btn-primary"
+                @onclick="ExportData"
+                disabled="@exporting">
+            <i class="bi bi-download"></i>
+            @(exporting ? "내보내는 중..." : "데이터 내보내기")
+        </button>
+
+        <!-- 데이터 가져오기 -->
+        <button class="btn btn-secondary"
+                @onclick="ImportData"
+                disabled="@(!fileReady || importing)">
+            <i class="bi bi-upload"></i>
+            @(importing ? "가져오는 중..." : "데이터 가져오기")
+        </button>
+
+        <!-- 파일 선택 -->
+        <div class="file-picker">
+            <InputFile id="file-input"
+                       OnChange="OnFileSelected"
+                       accept=".json"
+                       class="visually-hidden" />
+
+            <label for="file-input" class="btn btn-outline-secondary mb-0">
+                파일 선택
+            </label>
+            <span class="file-name">@selectedFileName</span>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert alert-@alertType mt-2">@statusMessage</div>
+    }
+</div>
+
+@code {
+    IBrowserFile? selectedFile;
+    string selectedFileName = "선택된 파일 없음";
+    bool fileReady = false;
+
+    bool importing = false;
+    bool exporting = false;
+
+    string statusMessage = "";
+    string alertType = "info";
+
+    Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        selectedFileName = selectedFile?.Name ?? "선택된 파일 없음";
+        fileReady = selectedFile is not null;
+        return Task.CompletedTask;
+    }
+
+    async Task ImportData()
+    {
+        if (selectedFile is null) return;
+
+        importing = true;
+        statusMessage = ""; StateHasChanged();
+
+        try
+        {
+            using var stream = selectedFile.OpenReadStream();
+            var data = await JsonSerializer.DeserializeAsync<object>(stream);
+
+            // TODO: data → DB 저장
+
+            statusMessage = "데이터를 성공적으로 가져왔습니다.";
+            alertType = "success";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"가져오기 실패: {ex.Message}";
+            alertType = "danger";
+        }
+        finally
+        {
+            importing = false;
+        }
+    }
+
+    async Task ExportData()
+    {
+        exporting = true;
+        statusMessage = ""; StateHasChanged();
+
+        try
+        {
+            // TODO: DB → JSON 변환 후 다운로드
+            await Task.Delay(1000);
+            statusMessage = "데이터를 성공적으로 내보냈습니다.";
+            alertType = "success";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"내보내기 실패: {ex.Message}";
+            alertType = "danger";
+        }
+        finally
+        {
+            exporting = false;
+        }
+    }
+}

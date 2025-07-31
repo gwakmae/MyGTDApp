@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.IO;
+using Microsoft.EntityFrameworkCore;
 using MyGtdApp.Components;
 using MyGtdApp.Services;
 using MyGtdApp.Models;
@@ -8,7 +9,11 @@ using System.Text.Json.Serialization; // ✨ JsonStringEnumConverter를 위해 �
 var builder = WebApplication.CreateBuilder(args);
 
 // --- 1. 서비스 등록 (SQLite 데이터베이스 사용) ---
-var connectionString = "Data Source=mygtd.db";
+var dbDir = Path.Combine(builder.Environment.ContentRootPath, "App_Data");
+Directory.CreateDirectory(dbDir);              // 폴더가 없으면 생성
+var dbPath = Path.Combine(dbDir, "mygtd.db");
+
+var connectionString = $"Data Source={dbPath}";
 builder.Services.AddDbContextFactory<GtdDbContext>(opt => opt.UseSqlite(connectionString));
 builder.Services.AddScoped<ITaskService, DatabaseTaskService>();
 
@@ -29,7 +34,7 @@ using (var scope = app.Services.CreateScope())
     if (!context.Tasks.Any())
     {
         var jsonText = File.ReadAllText("wwwroot/sample-data/tasks.json");
-        
+
         // 👇 아래 옵션에 JsonStringEnumConverter를 추가했습니다.
         var jsonOptions = new JsonSerializerOptions
         {

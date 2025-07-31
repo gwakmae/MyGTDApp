@@ -3,6 +3,8 @@ using MyGtdApp.Models;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Text.Json; // 추가됨
+using System.Text.Json.Serialization; // 추가됨
 
 // [수정됨] 이름 충돌을 피하기 위해 using 구문을 명시적으로 사용합니다.
 using TaskStatus = MyGtdApp.Models.TaskStatus;
@@ -78,9 +80,9 @@ namespace MyGtdApp.Services
 
             // 1) 모든 Task 를 한 번에 가져온다
             var allTasks = await context.Tasks
-                                         .AsNoTracking()    // 트래킹 안 해도 OK
-                                         .OrderBy(t => t.SortOrder)
-                                         .ToListAsync();
+                                        .AsNoTracking()  // 트래킹 안 해도 OK
+                                        .OrderBy(t => t.SortOrder)
+                                        .ToListAsync();
 
             // 2) 빠른 참조용 딕셔너리
             var lookup = allTasks.ToDictionary(t => t.Id);
@@ -105,8 +107,8 @@ namespace MyGtdApp.Services
             }
 
             var topLevel = allTasks.Where(t => t.ParentId == null)
-                                   .OrderBy(t => t.SortOrder)
-                                   .ToList();
+                                       .OrderBy(t => t.SortOrder)
+                                       .ToList();
 
             foreach (var root in topLevel) SortRecursive(root);
 
@@ -177,10 +179,10 @@ namespace MyGtdApp.Services
                     }
 
                     var parentInfo = await context.Tasks
-                                                     .AsNoTracking()
-                                                     .Where(t => t.Id == cursorId)
-                                                     .Select(t => new { t.ParentId })
-                                                     .FirstOrDefaultAsync();
+                                                    .AsNoTracking()
+                                                    .Where(t => t.Id == cursorId)
+                                                    .Select(t => new { t.ParentId })
+                                                    .FirstOrDefaultAsync();
 
                     if (parentInfo?.ParentId == null) break; // 더 올라갈 부모 없음
                     cursorId = parentInfo.ParentId.Value;    // 한 단계 위로
@@ -193,8 +195,8 @@ namespace MyGtdApp.Services
             // 원래 형제들의 SortOrder 재정렬
             var oldSiblings = await context.Tasks
                 .Where(t => t.ParentId == taskToMove.ParentId
-                         && t.Status == oldStatus
-                         && t.Id != taskId)
+                            && t.Status == oldStatus
+                            && t.Id != taskId)
                 .OrderBy(t => t.SortOrder)
                 .ToListAsync();
             for (int i = 0; i < oldSiblings.Count; i++)
@@ -207,8 +209,8 @@ namespace MyGtdApp.Services
             // 새 위치 형제들 + 자기 자신 정렬
             var newSiblings = await context.Tasks
                 .Where(t => t.ParentId == newParentId
-                         && t.Status == newStatus
-                         && t.Id != taskId)
+                            && t.Status == newStatus
+                            && t.Id != taskId)
                 .OrderBy(t => t.SortOrder)
                 .ToListAsync();
 
@@ -242,5 +244,71 @@ namespace MyGtdApp.Services
             await context.SaveChangesAsync();
             NotifyStateChanged();
         }
+
+        // 추가됨: 데이터 내보내기 메서드
+        public async Task<string> ExportTasksToJsonAsync()
+        {
+            using var context = _dbContextFactory.CreateDbContext();
+
+            // 모든 Task를 가져와서 JSON으로 직렬화
+            var allTasks = await context.Tasks
+                .AsNoTracking()
+                .OrderBy(t => t.Id)
+                .ToListAsync();
+
+            var exportData = new { tasks = allTasks };
+
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                Converters = { new JsonStringEnumConverter() }
+            };
+
+            return JsonSerializer.Serialize(exportData, options);
+        }
+
+        // 추가됨: 데이터 가져오기 메서드
+        public async Task ImportTasksFromJsonAsync(string jsonData)
+        {
+            using var context = _dbContextFactory.CreateDbContext();
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter() }
+            };
+
+            var importData = JsonSerializer.Deserialize<JsonTaskHelper>(jsonData, options);
+
+            if (importData?.Tasks != null && importData.Tasks.Any())
+            {
+                // 기존 데이터 모두 삭제
+                context.Tasks.RemoveRange(context.Tasks);
+
+                // 새 데이터 추가 (IsExpanded는 기본값 true로 설정됨)
+                context.Tasks.AddRange(importData.Tasks);
+
+                await context.SaveChangesAsync();
+                NotifyStateChanged();
+            }
+        }
+
+        public async Task UpdateTaskExpandStateAsync(int taskId, bool isExpanded)
+        {
+            using var context = _dbContextFactory.CreateDbContext();
+            var task = await context.Tasks.FindAsync(taskId);
+            if (task != null)
+            {
+                task.IsExpanded = isExpanded;
+                await context.SaveChangesAsync();
+                // UI 성능을 위해 OnChange 이벤트는 발생시키지 않음
+            }
+        }
     }
+    // 🚫 이 부분을 완전히 제거하세요
+    // internal class JsonTaskHelper
+    // {
+    //     public List<TaskItem>? Tasks { get; set; }
+    // }
 }

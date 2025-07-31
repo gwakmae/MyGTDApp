@@ -19,6 +19,14 @@
 {
     <div class="main-header">
         <h1>My GTD Board</h1>
+        <DataManager />
+        <!-- ✅ Hide / Show 버튼 -->
+        <button class="btn btn-outline-secondary ms-3"
+                title="Hide / Show completed tasks"
+                @onclick="() => hideCompleted = !hideCompleted">
+            <i class="bi @(hideCompleted ? "bi-eye-slash" : "bi-eye")"></i>
+            @(hideCompleted ? "Hide Completed" : "Show Completed")
+        </button>
     </div>
 
     <div class="board-container @(draggedTaskId != 0 ? "is-dragging" : "")">
@@ -26,9 +34,10 @@
         <div class="board-column today-column">
             <h3 class="column-header">Today</h3>
             <div class="task-list">
-                @foreach (var task in todayTasks)
+                @foreach (var task in FilterCompleted(todayTasks))
                 {
                     <ProjectTaskNode Task="task"
+                                     HideCompleted="hideCompleted"
                                      OnTaskAdded="HandleTaskAdded"
                                      OnTaskDeleted="HandleDeleteTask"
                                      OnTaskUpdated="HandleUpdateTask"
@@ -53,9 +62,10 @@
                 <h3 class="column-header">@status</h3>
 
                 <div class="task-list">
-                    @foreach (var task in GetTasksForStatus(status))
+                    @foreach (var task in FilterCompleted(GetTasksForStatus(status)))
                     {
                         <ProjectTaskNode Task="task"
+                                         HideCompleted="hideCompleted"
                                          OnTaskAdded="HandleTaskAdded"
                                          OnTaskDeleted="HandleDeleteTask"
                                          OnTaskUpdated="HandleUpdateTask"
@@ -90,13 +100,21 @@
 else
 {
     <div class="main-header">
-        <h1>Context: @Context</h1> @* 중괄호 두 번 → 한 번 *@
+        <h1>Context: @Context</h1>
+        <!-- ✅ Hide / Show 버튼 -->
+        <button class="btn btn-outline-secondary ms-3"
+                title="Hide / Show completed tasks"
+                @onclick="() => hideCompleted = !hideCompleted">
+            <i class="bi @(hideCompleted ? "bi-eye-slash" : "bi-eye")"></i>
+            @(hideCompleted ? "Hide Completed" : "Show Completed")
+        </button>
     </div>
 
     <div class="context-view-container">
-        @foreach (var task in contextTasks)
+        @foreach (var task in FilterCompleted(contextTasks))
         {
             <ProjectTaskNode Task="task"
+                             HideCompleted="hideCompleted"
                              OnTaskAdded="HandleTaskAdded"
                              OnTaskDeleted="HandleDeleteTask"
                              OnTaskUpdated="HandleUpdateTask"
@@ -137,6 +155,9 @@ else
 
     private IJSObjectReference? module; // JS 모듈을 참조할 객체
     private DotNetObjectReference<Home>? dotNetHelper;
+
+    // ───── 상태 ─────
+    private bool hideCompleted = false;   // ✅ 완료 카드 숨김 토글
 
     /* ----------------- 생명주기 ------------------ */
 
@@ -354,4 +375,8 @@ else
         };
         await HandleDropOnProject(targetTaskId, pos);
     }
+
+    // ✅ 완료 카드 숨김 필터 함수 추가
+    private IEnumerable<TaskItem> FilterCompleted(IEnumerable<TaskItem> src)
+        => hideCompleted ? src.Where(t => !t.IsCompleted) : src;
 }

@@ -16,7 +16,7 @@
 
         @if (Task.Children.Any())
         {
-            <span class="expander" @onclick="ToggleExpand">@(isExpanded ? "▼" : "▶")</span>
+            <span class="expander" @onclick="ToggleExpand">@(Task.IsExpanded ? "▼" : "▶")</span>
         }
         else
         {
@@ -32,10 +32,12 @@
         <button class="action-btn add-btn" @onclick="ToggleQuickAdd">+</button>
     </div>
 
-    @if (isExpanded)
+    @if (Task.IsExpanded)
     {
         <div class="task-node-children">
-            @foreach (var child in Task.Children.OrderBy(c => c.SortOrder))
+            @foreach (var child in Task.Children
+                    .Where(c => !HideCompleted || !c.IsCompleted)
+                    .OrderBy(c => c.SortOrder))
             {
                 <ProjectTaskNode Task="child"
                                  OnTaskAdded="OnTaskAdded"
@@ -46,7 +48,8 @@
                                  OnTaskDropped="OnTaskDropped"
                                  OnTaskCompletedToggle="OnTaskCompletedToggle"
                                  OnTaskDoubleClick="OnTaskDoubleClick"
-                                 DraggedTaskId="DraggedTaskId" />
+                                 DraggedTaskId="DraggedTaskId"
+                                 HideCompleted="HideCompleted" />
             }
 
             @if (isAddingChild)
@@ -71,6 +74,7 @@
     /*------------- Parameters -------------*/
     [Parameter, EditorRequired] public TaskItem Task { get; set; } = default!;
     [Parameter] public int DraggedTaskId { get; set; }
+    [Parameter] public bool HideCompleted { get; set; }
 
     [Parameter] public EventCallback OnTaskAdded { get; set; }
     [Parameter] public EventCallback<int> OnTaskDeleted { get; set; }
@@ -82,14 +86,14 @@
     [Parameter] public EventCallback<int> OnTaskDoubleClick { get; set; }
 
     /*------------- UI 상태 -------------*/
-    private bool isExpanded = true;
+    // 🚫 제거: private bool isExpanded = true;
     private bool isAddingChild = false;
     private string newChildTaskTitle = "";
     private ElementReference quickAddInputRefForChild;
 
     /* 드롭 위치 · 유효성 */
     private DropIndicator dropIndicator = DropIndicator.None;
-    private bool dropInvalid = false;   // ⬅ 드롭 불가 여부
+    private bool dropInvalid = false;    // ⬅ 드롭 불가 여부
 
     /*------------- CSS 클래스 계산 -------------*/
     private string DropIndicatorClass => dropIndicator switch
@@ -102,7 +106,13 @@
     private string InvalidClass => dropInvalid ? "drop-invalid" : "";
 
     /*------------- 토글/추가 -------------*/
-    private void ToggleExpand() => isExpanded = !isExpanded;
+    // 🔄 수정: Task.IsExpanded 사용 및 데이터베이스에 저장
+    private async Task ToggleExpand()
+    {
+        Task.IsExpanded = !Task.IsExpanded;
+        await TaskService.UpdateTaskExpandStateAsync(Task.Id, Task.IsExpanded);
+        StateHasChanged();
+    }
 
     private async Task ToggleQuickAdd()
     {
