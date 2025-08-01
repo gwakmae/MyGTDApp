@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using MyGtdApp.Services;
 
@@ -10,9 +11,11 @@ using MyGtdApp.Services;
 namespace MyGtdApp.Migrations
 {
     [DbContext(typeof(GtdDbContext))]
-    partial class GtdDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250801052646_AddPathDepthToTaskItem")]
+    partial class AddPathDepthToTaskItem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.7");

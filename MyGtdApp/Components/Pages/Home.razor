@@ -1,6 +1,5 @@
 ﻿@page "/"
 @page "/context/{Context}"
-
 @rendermode InteractiveServer
 
 @using MyGtdApp.Models
@@ -9,8 +8,6 @@
 @using Microsoft.AspNetCore.Components.Web
 @using TaskStatus = MyGtdApp.Models.TaskStatus
 
-@inject ITaskService TaskService
-@inject IJSRuntime JSRuntime
 @implements IAsyncDisposable
 
 <PageTitle>@(string.IsNullOrEmpty(Context) ? "GTD Board" : $"Context: @{Context}")</PageTitle>
@@ -19,20 +16,16 @@
 {
     <div class="main-header">
         <h1>My GTD Board</h1>
-
-        @* ① board-header 전용 클래스 추가 *@
         <DataManager class="data-manager board-header" />
-
         <button class="btn btn-outline-secondary ms-auto ms-xl-3"
                 title="Hide / Show completed tasks"
-                @onclick="() => hideCompleted = !hideCompleted">
+                @onclick="ToggleHideCompleted">
             <i class="bi @(hideCompleted ? "bi-eye-slash" : "bi-eye")"></i>
             @(hideCompleted ? "Hide Completed" : "Show Completed")
         </button>
     </div>
 
     <div class="board-container @(draggedTaskId != 0 ? "is-dragging" : "")">
-
         <div class="board-column today-column">
             <h3 class="column-header">Today</h3>
             <div class="task-list">
@@ -61,7 +54,22 @@
                  @ondragover="() => dragOverStatus = status"
                  @ondragleave="() => dragOverStatus = null">
 
-                <h3 class="column-header">@status</h3>
+                @* 🔄 헤더 부분 수정 - Completed 컬럼일 때만 삭제 버튼 추가 *@
+                @if (status == TaskStatus.Completed)
+                {
+                    <div class="column-header-with-action">
+                        <h3 class="column-header">@status</h3>
+                        <button class="btn-clear-completed"
+                                @onclick="HandleClearCompleted"
+                                title="Clear all completed tasks">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <h3 class="column-header">@status</h3>
+                }
 
                 <div class="task-list">
                     @foreach (var task in FilterCompleted(GetTasksForStatus(status)))
@@ -103,10 +111,9 @@ else
 {
     <div class="main-header">
         <h1>Context: @Context</h1>
-        <!-- ✅ Hide / Show 버튼 -->
         <button class="btn btn-outline-secondary ms-auto ms-xl-3"
                 title="Hide / Show completed tasks"
-                @onclick="() => hideCompleted = !hideCompleted">
+                @onclick="ToggleHideCompleted">
             <i class="bi @(hideCompleted ? "bi-eye-slash" : "bi-eye")"></i>
             @(hideCompleted ? "Hide Completed" : "Show Completed")
         </button>
@@ -135,250 +142,4 @@ else
     <TaskDetailModal TaskToEdit="taskToEdit"
                      OnSave="HandleSaveTask"
                      OnClose="CloseEditModal" />
-}
-
-@code
-{
-    /* ----------------- 파라미터 ----------------- */
-    [Parameter] public string? Context { get; set; }
-
-    /* ----------------- 상태 --------------------- */
-    private List<TaskItem> allTopLevelTasks = new();
-    private List<TaskItem> todayTasks = new();
-    private List<TaskItem> contextTasks = new();
-
-    private TaskStatus? dragOverStatus;
-    private TaskStatus? addingTaskStatus;
-    private int draggedTaskId;
-    private TaskItem? taskToEdit;
-
-    private string newTaskTitle = string.Empty;
-    private ElementReference quickAddInputRef;
-
-    private IJSObjectReference? module; // JS 모듈을 참조할 객체
-    private DotNetObjectReference<Home>? dotNetHelper;
-
-    // ───── 상태 ─────
-    private bool hideCompleted = false;   // ✅ 완료 카드 숨김 토글
-
-    /* ----------------- 생명주기 ------------------ */
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            // 1. JS 모듈을 안전하게 import하고 참조를 'module' 변수에 저장합니다.
-            module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/gtd-board.js");
-
-            // 2. C# <-> JS 통신을 위한 헬퍼 객체를 만듭니다.
-            dotNetHelper = DotNetObjectReference.Create(this);
-
-            // 3. import한 모듈 안에 있는 'setup' 함수를 호출합니다.
-            await module.InvokeVoidAsync("setup", dotNetHelper);
-        }
-    }
-
-    protected override async Task OnInitializedAsync()
-    {
-        await RefreshTasks();
-        TaskService.OnChange += HandleDataChanged;
-    }
-
-    protected override async Task OnParametersSetAsync()
-    {
-        await RefreshTasks();
-    }
-
-    /* ----------------- 데이터 로딩 --------------- */
-    private async Task RefreshTasks()
-    {
-        if (string.IsNullOrEmpty(Context))
-        {
-            var allTasks = TaskService.GetAllTasksAsync();
-            var today = TaskService.GetTodayTasksAsync();
-            await Task.WhenAll(allTasks, today);
-
-            allTopLevelTasks = allTasks.Result;
-            todayTasks = today.Result;
-        }
-        else
-        {
-            contextTasks = await TaskService.GetTasksByContextAsync($"@{Context}");
-        }
-
-        StateHasChanged();
-    }
-
-    /* ----------------- Drag & Drop ------------- */
-    private List<TaskItem> GetTasksForStatus(TaskStatus status) =>
-        allTopLevelTasks.Where(t => t.Status == status)
-                        .OrderBy(t => t.SortOrder)
-                        .ToList();
-
-    private void HandleDragStart(int id) => draggedTaskId = id;
-
-    private async Task HandleDragEnd()
-    {
-        if (draggedTaskId == 0) return;
-        draggedTaskId = 0;
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private string GetColumnDropClass(TaskStatus status) =>
-        dragOverStatus == status ? "drag-over" : "";
-
-    private async Task HandleDropOnColumn(TaskStatus targetStatus)
-    {
-        if (draggedTaskId == 0) return;
-
-        var siblings = GetTasksForStatus(targetStatus);
-        await TaskService.MoveTaskAsync(draggedTaskId, targetStatus, null, siblings.Count);
-        draggedTaskId = 0;
-    }
-
-    private async Task HandleDropOnProject(int targetTaskId, ProjectTaskNode.DropIndicator position)
-    {
-        if (draggedTaskId == 0 || draggedTaskId == targetTaskId) return;
-
-        var targetTask = FindTaskById(allTopLevelTasks, targetTaskId) ??
-                         FindTaskById(contextTasks, targetTaskId);
-        if (targetTask == null) return;
-
-        var (parentId, sortOrder) = position switch
-        {
-            ProjectTaskNode.DropIndicator.Inside => (targetTask.Id, targetTask.Children.Count),
-            ProjectTaskNode.DropIndicator.Above => (targetTask.ParentId, targetTask.SortOrder),
-            ProjectTaskNode.DropIndicator.Below => (targetTask.ParentId, targetTask.SortOrder + 1),
-            _ => (null, 0)
-        };
-
-        await TaskService.MoveTaskAsync(draggedTaskId, targetTask.Status, parentId, sortOrder);
-        draggedTaskId = 0;
-    }
-
-    private TaskItem? FindTaskById(IEnumerable<TaskItem> list, int id)
-    {
-        foreach (var t in list)
-        {
-            if (t.Id == id) return t;
-            var found = FindTaskById(t.Children, id);
-            if (found != null) return found;
-        }
-        return null;
-    }
-
-    /* ----------------- Quick-Add --------------- */
-    private async Task ShowQuickAdd(TaskStatus status)
-    {
-        addingTaskStatus = status;
-        await Task.Delay(50);
-        await quickAddInputRef.FocusAsync();
-    }
-
-    private void CancelQuickAdd()
-    {
-        addingTaskStatus = null;
-        newTaskTitle = "";
-    }
-
-    private async Task HandleQuickAddKeyUp(KeyboardEventArgs e, TaskStatus status)
-    {
-        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(newTaskTitle))
-        {
-            await TaskService.AddTaskAsync(newTaskTitle, status, null);
-            newTaskTitle = "";
-            await quickAddInputRef.FocusAsync();
-        }
-        else if (e.Key == "Escape")
-        {
-            CancelQuickAdd();
-        }
-    }
-
-    // [수정] HandleQuickAddBlur 메서드 추가
-    private async Task HandleQuickAddBlur(TaskStatus status)
-    {
-        // 입력된 내용이 있으면 자동으로 저장
-        if (!string.IsNullOrWhiteSpace(newTaskTitle))
-        {
-            await TaskService.AddTaskAsync(newTaskTitle, status, null);
-        }
-
-        // 상태 초기화
-        addingTaskStatus = null;
-        newTaskTitle = "";
-    }
-
-    /* -------------- CRUD 핸들러 ---------------- */
-    private Task HandleTaskAdded() => Task.CompletedTask;
-    private Task HandleUpdateTask() => Task.CompletedTask;
-
-    private async Task HandleToggleComplete(int id)
-    {
-        await TaskService.ToggleCompleteStatusAsync(id);
-    }
-
-    private async Task HandleDeleteTask(int id)
-    {
-        await TaskService.DeleteTaskAsync(id);
-    }
-
-    private void ShowEditModal(int id)
-    {
-        taskToEdit = FindTaskById(allTopLevelTasks, id) ??
-                     FindTaskById(contextTasks, id);
-    }
-
-    private async Task HandleSaveTask(TaskItem updated)
-    {
-        await TaskService.UpdateTaskAsync(updated);
-        CloseEditModal();
-    }
-
-    private void CloseEditModal() => taskToEdit = null;
-
-    /* -------------- 데이터 변경 알림 ------------ */
-    private async void HandleDataChanged()
-    {
-        await RefreshTasks();
-        await InvokeAsync(StateHasChanged);
-    }
-
-    /* -------------- IAsyncDisposable --------------- */
-    public async ValueTask DisposeAsync()
-    {
-        TaskService.OnChange -= HandleDataChanged;
-        dotNetHelper?.Dispose();
-
-        if (module is not null)
-        {
-            try
-            {
-                // 회로가 아직 살아있을 때만 정상적으로 실행됨
-                await module.DisposeAsync();
-            }
-            catch (JSDisconnectedException)
-            {
-                // 회로가 이미 끊겼다면 이 예외가 발생하지만,
-                // 정상적인 종료 과정이므로 아무것도 할 필요가 없음.
-                // 그냥 조용히 무시하고 넘어갑니다.
-            }
-        }
-    }
-
-    [JSInvokable]
-    public async Task HandleDropOnProject(int targetTaskId, string position)
-    {
-        var pos = position switch
-        {
-            "Above" => ProjectTaskNode.DropIndicator.Above,
-            "Below" => ProjectTaskNode.DropIndicator.Below,
-            _ => ProjectTaskNode.DropIndicator.Inside
-        };
-        await HandleDropOnProject(targetTaskId, pos);
-    }
-
-    // ✅ 완료 카드 숨김 필터 함수 추가
-    private IEnumerable<TaskItem> FilterCompleted(IEnumerable<TaskItem> src)
-        => hideCompleted ? src.Where(t => !t.IsCompleted) : src;
 }

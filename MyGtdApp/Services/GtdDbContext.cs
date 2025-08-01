@@ -10,4 +10,12 @@ public class GtdDbContext : DbContext
     }
 
     public DbSet<TaskItem> Tasks { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        // 추가 : TaskItem 구성 적용
+        modelBuilder.ApplyConfiguration(new TaskItemConfiguration());
+    }
 }

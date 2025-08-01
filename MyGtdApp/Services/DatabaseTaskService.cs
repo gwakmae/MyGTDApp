@@ -1,314 +1,150 @@
-﻿using Microsoft.EntityFrameworkCore;
-using MyGtdApp.Models;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Text.Json; // 추가됨
-using System.Text.Json.Serialization; // 추가됨
+﻿using MyGtdApp.Models;
+using MyGtdApp.Repositories;
+using TaskStatus = MyGtdApp.Models.TaskStatus; // 모호성 해결
 
-// [수정됨] 이름 충돌을 피하기 위해 using 구문을 명시적으로 사용합니다.
-using TaskStatus = MyGtdApp.Models.TaskStatus;
+namespace MyGtdApp.Services;
 
-namespace MyGtdApp.Services
+public class DatabaseTaskService : ITaskService
 {
-    public class DatabaseTaskService : ITaskService
+    private readonly ITaskRepository _repository;
+    private readonly ITaskMoveService _moveService;
+    private readonly ITaskDataService _dataService;
+
+    public event System.Action? OnChange;
+
+    public DatabaseTaskService(
+        ITaskRepository repository,
+        ITaskMoveService moveService,
+        ITaskDataService dataService)
     {
-        // [변경] DbContext 대신 DbContextFactory를 주입받습니다.
-        private readonly IDbContextFactory<GtdDbContext> _dbContextFactory;
+        _repository = repository;
+        _moveService = moveService;
+        _dataService = dataService;
+    }
 
-        public event System.Action? OnChange;
+    private void NotifyStateChanged() => OnChange?.Invoke();
 
-        // [변경] 생성자에서 DbContextFactory를 주입받습니다.
-        public DatabaseTaskService(IDbContextFactory<GtdDbContext> dbContextFactory)
+    public async Task<List<TaskItem>> GetAllTasksAsync()
+        => await _repository.GetAllAsync();
+
+    public async Task<TaskItem> AddTaskAsync(string title, TaskStatus status, int? parentId)
+    {
+        var newTask = new TaskItem
         {
-            _dbContextFactory = dbContextFactory;
+            Title = title,
+            Status = status,
+            ParentId = parentId
+        };
+
+        var result = await _repository.AddAsync(newTask);
+        NotifyStateChanged();
+        return result;
+    }
+
+    public async Task DeleteTaskAsync(int taskId)
+    {
+        await _repository.DeleteAsync(taskId);
+        NotifyStateChanged();
+    }
+
+    public async Task UpdateTaskAsync(TaskItem taskToUpdate)
+    {
+        await _repository.UpdateAsync(taskToUpdate);
+        NotifyStateChanged();
+    }
+
+    public async Task MoveTaskAsync(int taskId, TaskStatus newStatus, int? newParentId, int newSortOrder)
+    {
+        await _moveService.MoveTaskAsync(taskId, newStatus, newParentId, newSortOrder);
+        NotifyStateChanged();
+    }
+
+    // [수정됨] ToggleCompleteStatusAsync 메서드
+    public async Task ToggleCompleteStatusAsync(int taskId)
+    {
+        var task = await _repository.GetByIdAsync(taskId);
+        if (task is null) return;
+
+        var completed = !task.IsCompleted;
+
+        if (completed)
+        {
+            task.OriginalStatus = task.Status;
+            task.Status = TaskStatus.Completed;
         }
-
-        private void NotifyStateChanged() => OnChange?.Invoke();
-
-        // [변경] 모든 메서드에서 using 구문으로 context를 생성하도록 수정
-
-        public async Task<TaskItem> AddTaskAsync(string title, Models.TaskStatus status, int? parentId)
+        else
         {
-            using var context = _dbContextFactory.CreateDbContext();
+            task.Status = task.OriginalStatus ?? TaskStatus.NextActions;
+            task.OriginalStatus = null;
+        }
+        task.IsCompleted = completed;
+        await _repository.UpdateAsync(task);
 
-            var maxSortOrder = await context.Tasks
-                .Where(t => t.ParentId == parentId && t.Status == status)
-                .Select(t => (int?)t.SortOrder)
-                .MaxAsync() ?? -1;
+        // ★ 자식들도 동일 상태로 재귀 적용
+        await SetChildrenCompletedRecursive(taskId, completed);
 
-            var newTask = new TaskItem
+        NotifyStateChanged();
+    }
+
+    /* --- 아래 메서드 신규 추가 --- */
+    private async Task SetChildrenCompletedRecursive(int parentId, bool completed)
+    {
+        var stack = new Stack<int>();
+        stack.Push(parentId);
+
+        while (stack.Count > 0)
+        {
+            var id = stack.Pop();
+            var children = (await _repository.GetAllRawAsync())
+                           .Where(c => c.ParentId == id);
+
+            foreach (var c in children)
             {
-                Title = title,
-                Status = status,
-                ParentId = parentId,
-                SortOrder = maxSortOrder + 1
-            };
+                c.IsCompleted = completed;
+                c.Status = completed ? TaskStatus.Completed
+                                           : (c.OriginalStatus ?? TaskStatus.NextActions);
+                if (!completed) c.OriginalStatus = null;
 
-            context.Tasks.Add(newTask);
-            await context.SaveChangesAsync();
-            NotifyStateChanged();
-            return newTask;
-        }
-
-        public async Task DeleteTaskAsync(int taskId)
-        {
-            using var context = _dbContextFactory.CreateDbContext();
-            var taskToDelete = await context.Tasks.FindAsync(taskId);
-            if (taskToDelete != null)
-            {
-                await DeleteChildrenRecursive(context, taskId);
-                context.Tasks.Remove(taskToDelete);
-                await context.SaveChangesAsync();
-                NotifyStateChanged();
-            }
-        }
-        private async Task DeleteChildrenRecursive(GtdDbContext context, int parentId)
-        {
-            var children = await context.Tasks.Where(t => t.ParentId == parentId).ToListAsync();
-            foreach (var child in children)
-            {
-                await DeleteChildrenRecursive(context, child.Id);
-                context.Tasks.Remove(child);
-            }
-        }
-
-        // [수정] GetAllTasksAsync: 재귀형 트리 변환 방식으로 전체 변경
-        public async Task<List<TaskItem>> GetAllTasksAsync()
-        {
-            using var context = _dbContextFactory.CreateDbContext();
-
-            // 1) 모든 Task 를 한 번에 가져온다
-            var allTasks = await context.Tasks
-                                        .AsNoTracking()  // 트래킹 안 해도 OK
-                                        .OrderBy(t => t.SortOrder)
-                                        .ToListAsync();
-
-            // 2) 빠른 참조용 딕셔너리
-            var lookup = allTasks.ToDictionary(t => t.Id);
-
-            // 3) Children 컬렉션 초기화
-            foreach (var t in allTasks) t.Children = new();
-
-            // 4) 부모-자식 연결
-            foreach (var t in allTasks)
-            {
-                if (t.ParentId.HasValue && lookup.TryGetValue(t.ParentId.Value, out var parent))
-                {
-                    parent.Children.Add(t);
-                }
-            }
-
-            // 5) 정렬 & 재귀로 하위까지 정리
-            void SortRecursive(TaskItem node)
-            {
-                node.Children = node.Children.OrderBy(c => c.SortOrder).ToList();
-                foreach (var c in node.Children) SortRecursive(c);
-            }
-
-            var topLevel = allTasks.Where(t => t.ParentId == null)
-                                       .OrderBy(t => t.SortOrder)
-                                       .ToList();
-
-            foreach (var root in topLevel) SortRecursive(root);
-
-            return topLevel;
-        }
-
-        public async Task<List<string>> GetAllContextsAsync()
-        {
-            using var context = _dbContextFactory.CreateDbContext();
-
-            // 1. 먼저 DB에서 모든 Task를 메모리로 가져옵니다. (단순한 요청)
-            var allTasks = await context.Tasks.ToListAsync();
-
-            // 2. 메모리로 가져온 데이터를 C# 코드로 가공합니다. (복잡한 작업)
-            var allContexts = allTasks
-                                           .SelectMany(t => t.Contexts)
-                                           .Distinct()
-                                           .OrderBy(c => c)
-                                           .ToList(); // 이미 메모리에 있으므로 ToList() 사용
-
-            return allContexts;
-        }
-
-        public async Task<List<TaskItem>> GetTasksByContextAsync(string context)
-        {
-            using var contextDb = _dbContextFactory.CreateDbContext();
-            return await contextDb.Tasks
-                .Where(t => !t.IsCompleted && t.Contexts.Contains(context))
-                .OrderBy(t => t.Status)
-                .ThenBy(t => t.SortOrder)
-                .ToListAsync();
-        }
-
-        public async Task<List<TaskItem>> GetTodayTasksAsync()
-        {
-            using var context = _dbContextFactory.CreateDbContext();
-            var today = System.DateTime.Today;
-            return await context.Tasks.Where(t =>
-                !t.IsCompleted &&
-                t.StartDate.HasValue &&
-                t.StartDate.Value.Date <= today
-            ).OrderBy(t => t.DueDate ?? System.DateTime.MaxValue)
-             .ThenByDescending(t => t.Priority)
-             .ToListAsync();
-        }
-
-        public async Task MoveTaskAsync(
-            int taskId,
-            TaskStatus newStatus,
-            int? newParentId,
-            int newSortOrder)
-        {
-            using var context = _dbContextFactory.CreateDbContext();
-
-            var taskToMove = await context.Tasks.FindAsync(taskId);
-            if (taskToMove == null) return;
-
-            /* ---------- 순환 방지 로직 추가 시작 ---------- */
-            if (newParentId != null)
-            {
-                int cursorId = newParentId.Value;
-                while (true)
-                {
-                    if (cursorId == taskId)
-                    {
-                        // 자기 자손에게 넣으려는 시도 → 무시하고 그냥 리턴
-                        return;
-                    }
-
-                    var parentInfo = await context.Tasks
-                                                    .AsNoTracking()
-                                                    .Where(t => t.Id == cursorId)
-                                                    .Select(t => new { t.ParentId })
-                                                    .FirstOrDefaultAsync();
-
-                    if (parentInfo?.ParentId == null) break; // 더 올라갈 부모 없음
-                    cursorId = parentInfo.ParentId.Value;    // 한 단계 위로
-                }
-            }
-            /* ---------- 순환 방지 로직 추가 끝 ---------- */
-
-            var oldStatus = taskToMove.Status;
-
-            // 원래 형제들의 SortOrder 재정렬
-            var oldSiblings = await context.Tasks
-                .Where(t => t.ParentId == taskToMove.ParentId
-                            && t.Status == oldStatus
-                            && t.Id != taskId)
-                .OrderBy(t => t.SortOrder)
-                .ToListAsync();
-            for (int i = 0; i < oldSiblings.Count; i++)
-                oldSiblings[i].SortOrder = i;
-
-            // 이동
-            taskToMove.ParentId = newParentId;
-            taskToMove.Status = newStatus;
-
-            // 새 위치 형제들 + 자기 자신 정렬
-            var newSiblings = await context.Tasks
-                .Where(t => t.ParentId == newParentId
-                            && t.Status == newStatus
-                            && t.Id != taskId)
-                .OrderBy(t => t.SortOrder)
-                .ToListAsync();
-
-            newSortOrder = System.Math.Clamp(newSortOrder, 0, newSiblings.Count);
-            newSiblings.Insert(newSortOrder, taskToMove);
-
-            for (int i = 0; i < newSiblings.Count; i++)
-                newSiblings[i].SortOrder = i;
-
-            await context.SaveChangesAsync();
-            NotifyStateChanged();
-        }
-
-        public async Task ToggleCompleteStatusAsync(int taskId)
-        {
-            using var context = _dbContextFactory.CreateDbContext();
-            var task = await context.Tasks.FindAsync(taskId);
-            if (task != null)
-            {
-                task.IsCompleted = !task.IsCompleted;
-                task.Status = task.IsCompleted ? Models.TaskStatus.Completed : Models.TaskStatus.NextActions;
-                await context.SaveChangesAsync();
-                NotifyStateChanged();
-            }
-        }
-
-        public async Task UpdateTaskAsync(TaskItem taskToUpdate)
-        {
-            using var context = _dbContextFactory.CreateDbContext();
-            context.Tasks.Update(taskToUpdate);
-            await context.SaveChangesAsync();
-            NotifyStateChanged();
-        }
-
-        // 추가됨: 데이터 내보내기 메서드
-        public async Task<string> ExportTasksToJsonAsync()
-        {
-            using var context = _dbContextFactory.CreateDbContext();
-
-            // 모든 Task를 가져와서 JSON으로 직렬화
-            var allTasks = await context.Tasks
-                .AsNoTracking()
-                .OrderBy(t => t.Id)
-                .ToListAsync();
-
-            var exportData = new { tasks = allTasks };
-
-            var options = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                Converters = { new JsonStringEnumConverter() }
-            };
-
-            return JsonSerializer.Serialize(exportData, options);
-        }
-
-        // 추가됨: 데이터 가져오기 메서드
-        public async Task ImportTasksFromJsonAsync(string jsonData)
-        {
-            using var context = _dbContextFactory.CreateDbContext();
-
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                Converters = { new JsonStringEnumConverter() }
-            };
-
-            var importData = JsonSerializer.Deserialize<JsonTaskHelper>(jsonData, options);
-
-            if (importData?.Tasks != null && importData.Tasks.Any())
-            {
-                // 기존 데이터 모두 삭제
-                context.Tasks.RemoveRange(context.Tasks);
-
-                // 새 데이터 추가 (IsExpanded는 기본값 true로 설정됨)
-                context.Tasks.AddRange(importData.Tasks);
-
-                await context.SaveChangesAsync();
-                NotifyStateChanged();
-            }
-        }
-
-        public async Task UpdateTaskExpandStateAsync(int taskId, bool isExpanded)
-        {
-            using var context = _dbContextFactory.CreateDbContext();
-            var task = await context.Tasks.FindAsync(taskId);
-            if (task != null)
-            {
-                task.IsExpanded = isExpanded;
-                await context.SaveChangesAsync();
-                // UI 성능을 위해 OnChange 이벤트는 발생시키지 않음
+                await _repository.UpdateAsync(c);
+                stack.Push(c.Id);
             }
         }
     }
-    // 🚫 이 부분을 완전히 제거하세요
-    // internal class JsonTaskHelper
-    // {
-    //     public List<TaskItem>? Tasks { get; set; }
-    // }
+
+    public async Task<List<TaskItem>> GetTodayTasksAsync()
+        => await _repository.GetTodayTasksAsync();
+
+    public async Task<List<string>> GetAllContextsAsync()
+        => await _repository.GetAllContextsAsync();
+
+    public async Task<List<TaskItem>> GetTasksByContextAsync(string context)
+        => await _repository.GetByContextAsync(context);
+
+    public async Task<string> ExportTasksToJsonAsync()
+        => await _dataService.ExportTasksToJsonAsync();
+
+    public async Task ImportTasksFromJsonAsync(string jsonData)
+    {
+        await _dataService.ImportTasksFromJsonAsync(jsonData);
+        NotifyStateChanged();
+    }
+
+    public async Task UpdateTaskExpandStateAsync(int taskId, bool isExpanded)
+    {
+        await _repository.UpdateExpandStateAsync(taskId, isExpanded);
+        // UI 성능을 위해 OnChange 이벤트는 발생시키지 않음
+    }
+
+    // 🆕 추가: 완료된 항목 모두 삭제
+    public async Task DeleteAllCompletedTasksAsync()
+    {
+        var completedTasks = await _repository.GetByStatusAsync(TaskStatus.Completed);
+
+        foreach (var task in completedTasks)
+        {
+            await _repository.DeleteAsync(task.Id);
+        }
+
+        NotifyStateChanged();
+    }
 }

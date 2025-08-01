@@ -1,6 +1,9 @@
 ﻿@page "/data-manager"
 @using Microsoft.AspNetCore.Components.Forms
 @using System.Text.Json
+@using MyGtdApp.Services
+@inject ITaskService TaskService
+@inject IJSRuntime JSRuntime
 
 <div class="data-manager d-none d-xl-block @(Compact ? "compact" : "")"
      @attributes="AdditionalAttributes">
@@ -44,13 +47,11 @@
 </div>
 
 @code {
-    /* ───── 새 파라미터 ───── */
     [Parameter] public bool Compact { get; set; } = false;
 
     [Parameter(CaptureUnmatchedValues = true)]
     public Dictionary<string, object>? AdditionalAttributes { get; set; }
 
-    /* ───── 이하 기존 코드 그대로 ───── */
     IBrowserFile? selectedFile;
     string selectedFileName = "선택된 파일 없음";
     bool fileReady = false;
@@ -79,9 +80,10 @@
         try
         {
             using var stream = selectedFile.OpenReadStream();
-            var data = await JsonSerializer.DeserializeAsync<object>(stream);
+            using var reader = new StreamReader(stream);
+            var jsonData = await reader.ReadToEndAsync();
 
-            // TODO: data → DB 저장
+            await TaskService.ImportTasksFromJsonAsync(jsonData);
 
             statusMessage = "데이터를 성공적으로 가져왔습니다.";
             alertType = "success";
@@ -104,8 +106,10 @@
 
         try
         {
-            // TODO: DB → JSON 변환 후 다운로드
-            await Task.Delay(1000);
+            var jsonData = await TaskService.ExportTasksToJsonAsync();
+            var fileName = $"gtd-tasks-{DateTime.Now:yyyy-MM-dd}.json";
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, jsonData);
+
             statusMessage = "데이터를 성공적으로 내보냈습니다.";
             alertType = "success";
         }

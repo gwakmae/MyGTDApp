@@ -84,13 +84,25 @@ namespace MyGtdApp.Services
             return Task.CompletedTask;
         }
 
+        // [수정됨] ToggleCompleteStatusAsync 메서드
         public Task ToggleCompleteStatusAsync(int taskId)
         {
             var task = _tasks.FirstOrDefault(t => t.Id == taskId);
             if (task != null)
             {
-                task.IsCompleted = !task.IsCompleted;
-                task.Status = task.IsCompleted ? Models.TaskStatus.Completed : Models.TaskStatus.NextActions;
+                if (!task.IsCompleted) // 완료로 변경하는 경우
+                {
+                    task.OriginalStatus = task.Status; // 원본 상태 저장
+                    task.IsCompleted = true;
+                    task.Status = Models.TaskStatus.Completed;
+                }
+                else // 완료 해제하는 경우
+                {
+                    task.IsCompleted = false;
+                    // 원본 상태가 있으면 복원, 없으면 NextActions로 기본값
+                    task.Status = task.OriginalStatus ?? Models.TaskStatus.NextActions;
+                    task.OriginalStatus = null; // 복원 후 초기화
+                }
                 NotifyStateChanged();
             }
             return Task.CompletedTask;
@@ -221,11 +233,20 @@ namespace MyGtdApp.Services
             }
             return Task.CompletedTask;
         }
+
+        // 🆕 추가: 완료된 항목 모두 삭제
+        public Task DeleteAllCompletedTasksAsync()
+        {
+            var completedTasks = _tasks.Where(t => t.Status == Models.TaskStatus.Completed).ToList();
+
+            foreach (var task in completedTasks)
+            {
+                _tasks.Remove(task);
+            }
+
+            NotifyStateChanged();
+            return Task.CompletedTask;
+        }
     }
 
-    // 🚫 이 부분을 완전히 제거하세요
-    // internal class JsonTaskHelper
-    // {
-    //     public List<TaskItem>? Tasks { get; set; }
-    // }
 }

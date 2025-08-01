@@ -1,57 +1,111 @@
-﻿using System.IO;
+﻿// Program.cs
+// ─────────────────────────────────────────────────────────────
 using Microsoft.EntityFrameworkCore;
 using MyGtdApp.Components;
-using MyGtdApp.Services;
 using MyGtdApp.Models;
+using MyGtdApp.Repositories;
+using MyGtdApp.Services;
 using System.Text.Json;
-using System.Text.Json.Serialization; // ✨ JsonStringEnumConverter를 위해 추가
+using System.Text.Json.Serialization;
 
+// ------------------------------------------------------------
+// 0. 기본 빌더
+// ------------------------------------------------------------
 var builder = WebApplication.CreateBuilder(args);
 
-// --- 1. 서비스 등록 (SQLite 데이터베이스 사용) ---
-var dbDir = Path.Combine(builder.Environment.ContentRootPath, "App_Data");
-Directory.CreateDirectory(dbDir);              // 폴더가 없으면 생성
-var dbPath = Path.Combine(dbDir, "mygtd.db");
+// 메모리 캐시
+builder.Services.AddMemoryCache();
 
+// ------------------------------------------------------------
+// 1. 데이터베이스 (SQLite)
+// ------------------------------------------------------------
+var dbDir = Path.Combine(builder.Environment.ContentRootPath, "App_Data");
+Directory.CreateDirectory(dbDir);
+var dbPath = Path.Combine(dbDir, "mygtd.db");
 var connectionString = $"Data Source={dbPath}";
-builder.Services.AddDbContextFactory<GtdDbContext>(opt => opt.UseSqlite(connectionString));
+
+builder.Services.AddDbContextFactory<GtdDbContext>(opt =>
+    opt.UseSqlite(connectionString));
+
+// ------------------------------------------------------------
+// 2. 레포지터리 · 서비스 등록
+// ------------------------------------------------------------
+builder.Services.AddScoped<ITaskRepository, TaskRepository>();
+
+builder.Services.AddScoped<ITaskMoveService, TaskMoveService>();
+builder.Services.AddScoped<ITaskDataService, TaskDataService>();
 builder.Services.AddScoped<ITaskService, DatabaseTaskService>();
 
+// ------------------------------------------------------------
+// 3. Blazor 컴포넌트
+// ------------------------------------------------------------
 builder.Services.AddRazorComponents()
        .AddInteractiveServerComponents();
 
-// --- 2. 애플리케이션 빌드 ---
+// ------------------------------------------------------------
+// 4. 애플리케이션 빌드
+// ------------------------------------------------------------
 var app = builder.Build();
 
-// --- 3. 데이터베이스 초기화 및 초기 데이터 삽입 ---
+// ------------------------------------------------------------
+// 5. DB 초기화 & 샘플 데이터 삽입
+// ------------------------------------------------------------
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
-    var context = services.GetRequiredService<GtdDbContext>();
+    var dbContextFactory = services.GetRequiredService<IDbContextFactory<GtdDbContext>>();
 
-    context.Database.EnsureCreated();
-
-    if (!context.Tasks.Any())
+    // ➊ 첫 번째 DbContext : DB 생성 및 샘플 데이터 삽입
+    using (var ctx = dbContextFactory.CreateDbContext())
     {
-        var jsonText = File.ReadAllText("wwwroot/sample-data/tasks.json");
+        ctx.Database.EnsureCreated();
 
-        // 👇 아래 옵션에 JsonStringEnumConverter를 추가했습니다.
-        var jsonOptions = new JsonSerializerOptions
+        if (!ctx.Tasks.Any())
         {
-            PropertyNameCaseInsensitive = true,
-            Converters = { new JsonStringEnumConverter() }
-        };
-        var initialData = JsonSerializer.Deserialize<JsonTaskHelper>(jsonText, jsonOptions);
+            try
+            {
+                var jsonText = File.ReadAllText("wwwroot/sample-data/tasks.json");
 
-        if (initialData?.Tasks != null && initialData.Tasks.Any())
-        {
-            context.Tasks.AddRange(initialData.Tasks);
-            context.SaveChanges();
+                var jsonOptions = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    Converters = { new JsonStringEnumConverter() }
+                };
+
+                var initial = JsonSerializer.Deserialize<JsonTaskHelper>(jsonText, jsonOptions);
+
+                if (initial?.Tasks is { Count: > 0 })
+                {
+                    foreach (var t in initial.Tasks)
+                    {
+                        t.Children = new List<TaskItem>();
+                        t.Contexts ??= new List<string>();
+                        if (!t.IsExpanded) t.IsExpanded = true;
+                    }
+
+                    ctx.Tasks.AddRange(initial.Tasks);
+                    ctx.SaveChanges();
+
+                    Console.WriteLine($"샘플 데이터 {initial.Tasks.Count}건 삽입 완료");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"초기 데이터 삽입 오류: {ex.Message}");
+            }
         }
+    }
+
+    // ➋ ★ 두 번째 DbContext : Path · Depth 계산
+    using (var ctx2 = dbContextFactory.CreateDbContext())
+    {
+        await MyGtdApp.Infrastructure.Seeders.FillPathDepth.RunAsync(ctx2);
     }
 }
 
-// --- 4. 미들웨어 파이프라인 ---
+// ------------------------------------------------------------
+// 6. HTTP 파이프라인
+// ------------------------------------------------------------
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
@@ -65,11 +119,14 @@ app.UseAntiforgery();
 app.MapRazorComponents<App>()
    .AddInteractiveServerRenderMode();
 
-// --- 5. 애플리케이션 실행 ---
-app.Run();
-
-// --- 6. JSON 파싱을 위한 헬퍼 클래스 ---
-public class JsonTaskHelper
+// 개발용 디버그 엔드포인트
+if (app.Environment.IsDevelopment())
 {
-    public List<TaskItem> Tasks { get; set; } = new();
+    app.MapGet("/api/debug/tasks", async (ITaskService taskSvc) =>
+    {
+        var tasks = await taskSvc.GetAllTasksAsync();
+        return Results.Json(tasks);
+    });
 }
+
+app.Run();

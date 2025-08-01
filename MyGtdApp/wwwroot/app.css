@@ -320,3 +320,50 @@ body {
             display: none;
         }
 }
+
+/* wwwroot/app.css - 기존 스타일에 추가 */
+
+/* --- Completed Column Header with Clear Button --- */
+.column-header-with-action {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem;
+}
+
+    .column-header-with-action .column-header {
+        margin: 0;
+        padding: 0;
+        flex-grow: 1;
+    }
+
+.btn-clear-completed {
+    background: none;
+    border: none;
+    color: #6c757d;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .btn-clear-completed:hover {
+        color: #dc3545;
+        background-color: rgba(220, 53, 69, 0.1);
+    }
+
+    .btn-clear-completed:active {
+        transform: scale(0.95);
+    }
+
+/* --- 반응형: 모바일에서 버튼 크기 조정 --- */
+@media (max-width: 767.98px) {
+    .btn-clear-completed {
+        font-size: 1.1rem;
+        padding: 0.5rem;
+    }
+}
