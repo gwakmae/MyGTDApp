@@ -13,7 +13,7 @@
 
     <main>
         <div class="mobile-header">
-            <HamburgerButton OnToggle="ToggleSidebar" />
+            <HamburgerButton OnToggle="SyncSidebarState" />
             <span class="mobile-header-title">GTD Board</span>
         </div>
 
@@ -24,11 +24,11 @@
 </div>
 
 @code {
-    private bool isSidebarOpen = false;
+    private bool isSidebarOpen;
 
     private void ToggleSidebar()
-    {
-        isSidebarOpen = !isSidebarOpen;
-        StateHasChanged();
-    }
+        => isSidebarOpen = !isSidebarOpen;
+
+    private void SyncSidebarState(bool open)
+        => isSidebarOpen = open;
 }

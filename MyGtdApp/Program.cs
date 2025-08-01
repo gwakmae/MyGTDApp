@@ -35,6 +35,8 @@ builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<ITaskMoveService, TaskMoveService>();
 builder.Services.AddScoped<ITaskDataService, TaskDataService>();
 builder.Services.AddScoped<ITaskService, DatabaseTaskService>();
+builder.Services.AddScoped<ISidebarJsService, SidebarJsService>();
+builder.Services.AddScoped<IGtdBoardJsService, GtdBoardJsService>();
 
 // ------------------------------------------------------------
 // 3. Blazor 컴포넌트
@@ -111,6 +113,19 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
+
+/* ✚ 추가 : CSP */
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.Headers["Content-Security-Policy"] =
+        "default-src 'self'; " +
+        "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; " +
+        "style-src  'self' 'unsafe-inline'; " +
+        "img-src    'self' data:; " +
+        "connect-src 'self' wss:; " +
+        "frame-ancestors 'self';";
+    await next();
+});
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

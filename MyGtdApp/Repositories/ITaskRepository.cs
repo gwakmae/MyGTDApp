@@ -16,4 +16,5 @@ public interface ITaskRepository
     Task<List<string>> GetAllContextsAsync();
     Task UpdateExpandStateAsync(int taskId, bool isExpanded);
     Task<List<TaskItem>> GetAllRawAsync();
+    Task DeleteByStatusRecursiveAsync(TaskStatus status);
 }

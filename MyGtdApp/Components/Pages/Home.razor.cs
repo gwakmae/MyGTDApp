@@ -13,6 +13,7 @@ namespace MyGtdApp.Components.Pages
         /* ──────────────── DI ──────────────── */
         [Inject] private ITaskService TaskService { get; set; } = default!;
         [Inject] private IJSRuntime JSRuntime { get; set; } = default!;   // ⬅ 추가
+        [Inject] private IGtdBoardJsService BoardJs { get; set; } = default!; // ⬅ 추가
 
         /* ──────────────── 라우트 파라미터 ──────────────── */
         [Parameter] public string? Context { get; set; }
@@ -41,6 +42,15 @@ namespace MyGtdApp.Components.Pages
         }
 
         protected override async Task OnParametersSetAsync() => await RefreshTasks();
+
+        protected override async Task OnAfterRenderAsync(bool first)
+        {
+            if (first)
+            {
+                var helper = DotNetObjectReference.Create<object>(this);
+                await BoardJs.SetupAsync(helper);
+            }
+        }
 
         /* ──────────────── 서비스 이벤트 ------------------ */
         private async void HandleTaskServiceChange()
@@ -76,10 +86,10 @@ namespace MyGtdApp.Components.Pages
         }
 
         /* ──────────────── IAsyncDisposable -------------- */
-        public ValueTask DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             TaskService.OnChange -= HandleTaskServiceChange;
-            return ValueTask.CompletedTask;
+            await BoardJs.DisposeAsync();
         }
     }
 }

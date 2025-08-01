@@ -41,13 +41,16 @@ public class TaskDataService : ITaskDataService
         await using var tx = await ctx.Database.BeginTransactionAsync();
         try
         {
-            ctx.Tasks.RemoveRange(ctx.Tasks);          // 전체 삭제
+            ctx.Tasks.RemoveRange(ctx.Tasks);           // 전체 삭제
             await ctx.SaveChangesAsync();
 
-            ctx.Tasks.AddRange(dto.Tasks);             // 새 데이터 삽입
+            ctx.Tasks.AddRange(dto.Tasks);              // 새 데이터 삽입
             await ctx.SaveChangesAsync();
 
             await tx.CommitAsync();
+
+            // ▶ 관계(Path/Depth) 다시 계산
+            await Infrastructure.Seeders.FillPathDepth.RunAsync(ctx);
         }
         catch
         {
@@ -56,5 +59,3 @@ public class TaskDataService : ITaskDataService
         }
     }
 }
-
-

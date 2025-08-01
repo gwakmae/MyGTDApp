@@ -19,9 +19,9 @@ public class TaskRepository : ITaskRepository
         using var context = _dbContextFactory.CreateDbContext();
 
         var allTasks = await context.Tasks
-                                    .AsNoTracking()
-                                    .OrderBy(t => t.SortOrder)
-                                    .ToListAsync();
+                                     .AsNoTracking()
+                                     .OrderBy(t => t.SortOrder)
+                                     .ToListAsync();
 
         var lookup = allTasks.ToDictionary(t => t.Id);
 
@@ -77,7 +77,7 @@ public class TaskRepository : ITaskRepository
         task.SortOrder = maxSortOrder + 1;
 
         context.Tasks.Add(task);
-        await context.SaveChangesAsync();   // Id 확정
+        await context.SaveChangesAsync();    // Id 확정
 
         /* ---------- 여기부터 변경 ---------- */
         string Pad(int n) => n.ToString("D6");
@@ -137,6 +137,21 @@ public class TaskRepository : ITaskRepository
             .ToListAsync();
     }
 
+    public async Task DeleteByStatusRecursiveAsync(TaskStatus status)
+    {
+        using var ctx = _dbContextFactory.CreateDbContext();
+        var roots = await ctx.Tasks
+                              .Where(t => t.Status == status)
+                              .ToListAsync();
+
+        foreach (var r in roots)
+        {
+            await DeleteChildrenRecursive(ctx, r.Id);
+            ctx.Tasks.Remove(r);
+        }
+        await ctx.SaveChangesAsync();
+    }
+
     public async Task<List<TaskItem>> GetByContextAsync(string context)
     {
         using var contextDb = _dbContextFactory.CreateDbContext();
@@ -166,10 +181,10 @@ public class TaskRepository : ITaskRepository
         var allTasks = await context.Tasks.ToListAsync();
 
         var allContexts = allTasks
-                         .SelectMany(t => t.Contexts)
-                         .Distinct()
-                         .OrderBy(c => c)
-                         .ToList();
+                                   .SelectMany(t => t.Contexts)
+                                   .Distinct()
+                                   .OrderBy(c => c)
+                                   .ToList();
 
         return allContexts;
     }

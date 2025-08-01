@@ -102,7 +102,7 @@ public class DatabaseTaskService : ITaskService
             {
                 c.IsCompleted = completed;
                 c.Status = completed ? TaskStatus.Completed
-                                           : (c.OriginalStatus ?? TaskStatus.NextActions);
+                                     : (c.OriginalStatus ?? TaskStatus.NextActions);
                 if (!completed) c.OriginalStatus = null;
 
                 await _repository.UpdateAsync(c);
@@ -138,13 +138,7 @@ public class DatabaseTaskService : ITaskService
     // 🆕 추가: 완료된 항목 모두 삭제
     public async Task DeleteAllCompletedTasksAsync()
     {
-        var completedTasks = await _repository.GetByStatusAsync(TaskStatus.Completed);
-
-        foreach (var task in completedTasks)
-        {
-            await _repository.DeleteAsync(task.Id);
-        }
-
+        await _repository.DeleteByStatusRecursiveAsync(TaskStatus.Completed);
         NotifyStateChanged();
     }
 }

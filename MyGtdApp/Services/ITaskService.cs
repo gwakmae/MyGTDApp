@@ -8,7 +8,7 @@ namespace MyGtdApp.Services
 {
     public interface ITaskService
     {
-        event Action OnChange;
+        event Action? OnChange;
 
         Task<List<TaskItem>> GetAllTasksAsync();
         Task MoveTaskAsync(int taskId, TaskStatus newStatus, int? newParentId, int newSortOrder);
