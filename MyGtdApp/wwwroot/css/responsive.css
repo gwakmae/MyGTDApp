@@ -2,6 +2,10 @@
 
 /* === 태블릿 반응형 (768px - 1199px) === */
 @media (min-width: 768px) and (max-width: 1199.98px) {
+    main {
+        padding-left: 0;
+    }
+    /* 사이드바 폭만큼 좌측 여백 제거 */
     .board-container {
         flex-wrap: wrap;
         overflow-x: hidden;

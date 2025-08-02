@@ -9,9 +9,10 @@
 }
 
 .sidebar {
-    background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
+    background-image: var(--gradient-primary); /* 팔레트 토큰 사용 */
     width: 250px;
-    flex-shrink: 0; /* 사이드바 너비가 줄어들지 않도록 고정 */
+    flex-shrink: 0;
+    border-right: 1px solid var(--border-color); /* 데스크톱 경계선 */
 }
 
 main {
@@ -22,6 +23,11 @@ main {
     background-color: #f4f5f7;
     min-width: 0; /* flex 아이템이 부모를 넘어가지 않도록 함 */
 }
+
+    main.pushed { /* 태블릿: 사이드바 열릴 때 본문 밀림 */
+        transform: translateX(250px);
+        transition: transform .3s cubic-bezier(.4,0,.2,1);
+    }
 
 .content {
     flex: 1;

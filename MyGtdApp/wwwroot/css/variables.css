@@ -1,7 +1,9 @@
 ﻿/* CSS 커스텀 프로퍼티 (변수) */
 :root {
     /* 컬러 팔레트 */
-    --primary-color: #4f46e5;
+    --primary-900: #15204b;
+    --primary-600: #3b4fde;
+    --primary-color: var(--primary-600);
     --secondary-color: #06b6d4;
     --background-color: #f4f5f7;
     --card-background: #ffffff;
@@ -10,8 +12,9 @@
     --text-secondary: #6b7280;
     --text-muted: #5e6c84;
     /* 그라데이션 */
-    --gradient-primary: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+    --gradient-primary: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-600) 100%);
     --gradient-header: linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(165, 243, 252, 0.08) 50%, rgba(254, 240, 138, 0.08) 100%);
+    --accent-amber: #fec84a;
     /* 간격 */
     --spacing-xs: 0.25rem;
     --spacing-sm: 0.5rem;

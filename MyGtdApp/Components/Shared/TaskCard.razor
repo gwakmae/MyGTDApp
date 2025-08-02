@@ -5,9 +5,8 @@
 <div class="task-card-content @(Task.IsCompleted ? "is-completed" : "") @DueDateClass"
      @ondblclick="() => OnTaskDoubleClick.InvokeAsync(Task.Id)">
 
-    <input type="checkbox" class="task-checkbox"
-           checked="@Task.IsCompleted"
-           @onchange="() => OnTaskCompletedToggle.InvokeAsync(Task.Id)" />
+    <i class="bi @(Task.IsCompleted ? "bi-check-square" : "bi-square") task-checkbox"
+       @onclick="() => OnTaskCompletedToggle.InvokeAsync(Task.Id)"></i>
 
     <span class="task-title">@Task.Title</span>
 

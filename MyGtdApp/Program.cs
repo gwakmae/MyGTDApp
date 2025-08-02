@@ -119,12 +119,11 @@ app.Use(async (ctx, next) =>
 {
     ctx.Response.Headers["Content-Security-Policy"] =
         "default-src 'self'; " +
+        "connect-src 'self' ws: wss: https:; " +    // ✅ WebSocket 허용
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; " +
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
-        "style-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
-        "font-src 'self' https://cdn.jsdelivr.net data:; " +
-        "img-src 'self' data: blob:; " +
-        "connect-src 'self' wss: ws: https:; " +
+        "style-src  'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+        "font-src   'self' https://cdn.jsdelivr.net data:; " +
+        "img-src    'self' data: blob:; " +
         "frame-ancestors 'self';";
     await next();
 });

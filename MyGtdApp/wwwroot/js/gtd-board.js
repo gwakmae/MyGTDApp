@@ -2,6 +2,8 @@
 
 import * as Constants from './modules/constants.js';
 import { handler } from './modules/drag-main.js';
+import { onSidebarToggled } from './sidebar.js';    /* 사이드바 버스 */
+import * as utils from './modules/utils.js';         /* ⬅️ 추가 */
 
 // ===== 메인 설정 함수 =====
 export function setup(helper) {
@@ -14,16 +16,21 @@ export function setup(helper) {
     });
 
     console.log("[DRAG] GTD Board 드래그 시스템 초기화 완료");
+
+    /* 사이드바 열림 시 RAF 취소 – 좌표 틀어짐 방지 */
+    onSidebarToggled(() => {
+        utils.cancelScheduledUpdate(); // 이제 utils 는 모듈 스코프에 존재
+    });
 }
 
 /*
-  이제 각 기능별로 모듈이 분리되어 있습니다:
-  
-  - constants.js: 상수 및 전역 변수 관리
-  - utils.js: 햅틱, 애니메이션, 성능 최적화 유틸리티
-  - drag-detection.js: 터치 감지 및 요소 찾기
-  - drag-calculation.js: 드롭 위치 계산 및 검증
-  - drag-visual.js: 시각적 피드백 및 하이라이트
-  - drag-main.js: 메인 드래그 로직 및 이벤트 핸들러
-  - gtd-board.js: 진입점 및 통합
+    이제 각 기능별로 모듈이 분리되어 있습니다:
+    
+    - constants.js: 상수 및 전역 변수 관리
+    - utils.js: 햅틱, 애니메이션, 성능 최적화 유틸리티
+    - drag-detection.js: 터치 감지 및 요소 찾기
+    - drag-calculation.js: 드롭 위치 계산 및 검증
+    - drag-visual.js: 시각적 피드백 및 하이라이트
+    - drag-main.js: 메인 드래그 로직 및 이벤트 핸들러
+    - gtd-board.js: 진입점 및 통합
 */

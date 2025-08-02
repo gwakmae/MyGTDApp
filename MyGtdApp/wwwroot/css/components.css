@@ -37,6 +37,11 @@
     margin: -3px 0;
 }
 
+    .task-node-self.drop-inside {
+        background: rgba(59,130,246,.15); /* 유지 */
+        border-color: var(--primary-600); /* 동일 색조 */
+    }
+
 .task-card-wrapper {
     flex-grow: 1;
 }

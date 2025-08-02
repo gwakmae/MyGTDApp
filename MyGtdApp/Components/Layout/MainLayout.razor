@@ -11,7 +11,7 @@
         <div class="sidebar-backdrop is-open" @onclick="ToggleSidebar"></div>
     }
 
-    <main>
+    <main class="@(isSidebarOpen ? "pushed" : "")">
         <div class="mobile-header">
             <HamburgerButton OnToggle="SyncSidebarState" />
             <span class="mobile-header-title">GTD Board</span>
