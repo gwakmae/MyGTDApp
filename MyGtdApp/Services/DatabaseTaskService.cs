@@ -106,9 +106,7 @@ public class DatabaseTaskService : ITaskService
                 if (!completed) c.OriginalStatus = null;
 
                 await _repository.UpdateAsync(c);
-                Console.WriteLine($"[LOG] 업데이트: id={c.Id}, title={c.Title}, completed={completed}"); // ← 로그 추가
                 stack.Push(c.Id);
-                Console.WriteLine($"[LOG] 자식 푸시: id={c.Id}"); // ← 자식 푸시 로그 추가
             }
         }
     }

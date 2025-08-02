@@ -17,6 +17,16 @@ public sealed class GtdBoardJsService : IGtdBoardJsService
 
     public async ValueTask DisposeAsync()
     {
-        if (_module is not null) await _module.DisposeAsync();
+        if (_module is null) return;
+
+        // 연결이 살아 있을 때만 JS 호출
+        if (_js is IJSInProcessRuntime ||     // WebAssembly 모드
+            (_js as IJSRuntime is not null && // Server 모드
+             ((IJSUnmarshalledRuntime?)_js) is not null))
+        {
+            await _module.DisposeAsync();
+        }
+
+        _module = null;
     }
 }

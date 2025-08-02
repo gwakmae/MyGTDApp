@@ -38,6 +38,7 @@ builder.Services.AddScoped<ITaskService, DatabaseTaskService>();
 builder.Services.AddScoped<ISidebarJsService, SidebarJsService>();
 builder.Services.AddScoped<IGtdBoardJsService, GtdBoardJsService>();
 
+
 // ------------------------------------------------------------
 // 3. Blazor 컴포넌트
 // ------------------------------------------------------------
@@ -112,14 +113,20 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
     app.UseHsts();
+    app.UseHttpsRedirection(); // 프로덕션에서만 실행
 }
+else
+{
+    Console.WriteLine("[DEV] HTTPS 리디렉션 비활성화");
+}
+
 
 /* ✚ 추가 : CSP */
 app.Use(async (ctx, next) =>
 {
     ctx.Response.Headers["Content-Security-Policy"] =
         "default-src 'self'; " +
-        "connect-src 'self' ws: wss: https:; " +    // ✅ WebSocket 허용
+        "connect-src 'self' ws: wss: https: http://localhost:*; " +  // 🔧 http://localhost:* 추가
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; " +
         "style-src  'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
         "font-src   'self' https://cdn.jsdelivr.net data:; " +
@@ -128,7 +135,7 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
-app.UseHttpsRedirection();
+
 app.UseStaticFiles();
 app.UseAntiforgery();
 

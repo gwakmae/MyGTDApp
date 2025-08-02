@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;                 // ⬅ JSRuntime
+using Microsoft.JSInterop;
 using MyGtdApp.Models;
 using MyGtdApp.Services;
 using System.Collections.Generic;
@@ -12,8 +12,8 @@ namespace MyGtdApp.Components.Pages
     {
         /* ──────────────── DI ──────────────── */
         [Inject] private ITaskService TaskService { get; set; } = default!;
-        [Inject] private IJSRuntime JSRuntime { get; set; } = default!;   // ⬅ 추가
-        [Inject] private IGtdBoardJsService BoardJs { get; set; } = default!; // ⬅ 추가
+        [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+        [Inject] private IGtdBoardJsService BoardJs { get; set; } = default!;
 
         /* ──────────────── 라우트 파라미터 ──────────────── */
         [Parameter] public string? Context { get; set; }
@@ -24,20 +24,21 @@ namespace MyGtdApp.Components.Pages
         private List<TaskItem> contextTasks = new();
 
         /* ──────────────── UI 상태 ----------------------- */
-        private bool hideCompleted = false;          // 완료 항목 숨김 여부
-        private TaskStatus? addingTaskStatus = null;          // 현재 “빠른 추가” 컬럼
-        private string newTaskTitle = "";             // 빠른 추가 입력값
-        private ElementReference quickAddInputRef;            // 빠른 추가 입력 박스
-        private int draggedTaskId = 0;              // D&D : 드래그 중 ID
-        private TaskStatus? dragOverStatus = null;           // D&D : 마우스 오버 컬럼
-        private TaskItem? taskToEdit = null;           // 편집 모달 대상
+        private bool hideCompleted = false;
+        private TaskStatus? addingTaskStatus = null;
+        private string newTaskTitle = "";
+        private ElementReference quickAddInputRef;
+        private int draggedTaskId = 0;
+        private TaskStatus? dragOverStatus = null;
+        private TaskItem? taskToEdit = null;
 
         /* ──────────────── 생명주기 ---------------------- */
         protected override async Task OnInitializedAsync()
         {
-            await LoadHideCompletedState();    // ← 추가
+            // ❌ 이 줄 제거 - OnAfterRenderAsync에서 처리
+            // await LoadHideCompletedState();
 
-            await RefreshTasks();              // 기존 코드
+            await RefreshTasks();
             TaskService.OnChange += HandleTaskServiceChange;
         }
 
@@ -49,13 +50,16 @@ namespace MyGtdApp.Components.Pages
             {
                 var helper = DotNetObjectReference.Create<object>(this);
                 await BoardJs.SetupAsync(helper);
+
+                // ✅ 첫 렌더링 후 localStorage 상태 로드
+                await LoadHideCompletedState();
             }
         }
 
         /* ──────────────── 서비스 이벤트 ------------------ */
         private async void HandleTaskServiceChange()
         {
-            await InvokeAsync(RefreshTasks);   // 깔끔하게 한 줄
+            await InvokeAsync(RefreshTasks);
         }
 
         /* ──────────────── 데이터 새로고침 --------------- */
@@ -79,6 +83,7 @@ namespace MyGtdApp.Components.Pages
             await TaskService.AddTaskAsync(title, TaskStatus.Inbox, null);
             await RefreshTasks();
         }
+
         private async Task DeleteTask(int id)
         {
             await TaskService.DeleteTaskAsync(id);
@@ -86,10 +91,10 @@ namespace MyGtdApp.Components.Pages
         }
 
         /* ──────────────── IAsyncDisposable -------------- */
-        public async ValueTask DisposeAsync()
+        public ValueTask DisposeAsync()
         {
             TaskService.OnChange -= HandleTaskServiceChange;
-            await BoardJs.DisposeAsync();
+            return ValueTask.CompletedTask;
         }
     }
 }

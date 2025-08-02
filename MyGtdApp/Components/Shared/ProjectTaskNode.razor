@@ -35,6 +35,9 @@
     @if (Task.IsExpanded)
     {
         <div class="task-node-children">
+            @* 🔧 Parent와 첫 번째 Child 간격 해결을 위한 구분 요소 추가 *@
+            <div class="task-separator"></div>
+
             @foreach (var child in Task.Children
                     .Where(c => !HideCompleted || !c.IsCompleted)
                     .OrderBy(c => c.SortOrder))
@@ -121,7 +124,20 @@
         if (isAddingChild)
         {
             await System.Threading.Tasks.Task.Delay(50);
-            await quickAddInputRefForChild.FocusAsync();
+
+            // 🔧 ElementReference 안전성 강화
+            try
+            {
+                if (quickAddInputRefForChild.Context != null)
+                {
+                    await quickAddInputRefForChild.FocusAsync();
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                Console.WriteLine($"[WARN] ElementReference 포커스 실패: {ex.Message}");
+                // 포커스 실패해도 계속 진행
+            }
         }
     }
 
@@ -132,7 +148,19 @@
             await TaskService.AddTaskAsync(newChildTaskTitle, Task.Status, Task.Id);
             newChildTaskTitle = "";
             await OnTaskAdded.InvokeAsync();
-            await quickAddInputRefForChild.FocusAsync();
+
+            // 🔧 안전한 포커스 처리
+            try
+            {
+                if (quickAddInputRefForChild.Context != null)
+                {
+                    await quickAddInputRefForChild.FocusAsync();
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // 포커스 실패 시 무시
+            }
         }
         else if (e.Key == "Escape")
         {

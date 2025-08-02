@@ -58,15 +58,6 @@
     width: 24px;
 }
 
-.task-node-children {
-    padding-left: 0;
-    border-left: 2px solid var(--border-color);
-    margin-left: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-}
-
 .task-title {
     flex-grow: 1;
     padding: var(--spacing-xs);
