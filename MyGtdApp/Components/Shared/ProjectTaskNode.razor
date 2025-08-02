@@ -39,7 +39,8 @@
                     .Where(c => !HideCompleted || !c.IsCompleted)
                     .OrderBy(c => c.SortOrder))
             {
-                <ProjectTaskNode Task="child"
+                <ProjectTaskNode @key="child.Id"
+                                 Task="child"
                                  OnTaskAdded="OnTaskAdded"
                                  OnTaskDeleted="OnTaskDeleted"
                                  OnTaskUpdated="OnTaskUpdated"

@@ -1,0 +1,77 @@
+﻿/* 애니메이션 및 트랜지션 */
+
+/* === 애니메이션 === */
+.modern-header {
+    animation: slideDown 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.logo-icon {
+    animation: float 4s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-2px);
+    }
+}
+
+/* 버튼 호버 애니메이션 */
+.btn-modern {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.action-btn {
+    transition: all var(--transition-fast);
+}
+
+.task-card-content {
+    transition: background-color var(--transition-fast);
+}
+
+.board-column {
+    transition: background-color var(--transition-fast);
+}
+
+.add-task-btn {
+    transition: background-color var(--transition-fast);
+}
+
+.btn-clear-completed {
+    transition: all var(--transition-fast);
+}
+
+/* 드래그 중 애니메이션 비활성화 */
+.board-container.is-dragging * {
+    transition: none !important;
+}
+
+/* 접근성: 모션 감소 설정 */
+@media (prefers-reduced-motion: reduce) {
+    .modern-header {
+        animation: none;
+    }
+
+    .logo-icon {
+        animation: none;
+    }
+
+    * {
+        transition-duration: 0.01ms !important;
+    }
+}

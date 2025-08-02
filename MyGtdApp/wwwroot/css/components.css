@@ -1,0 +1,155 @@
+﻿/* 태스크 카드, 버튼 등 컴포넌트 스타일 */
+
+/* --- Task Lists & Items --- */
+.task-list {
+    min-height: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.task-node.is-ghost {
+    opacity: 0.4;
+}
+
+.task-card-content {
+    background-color: var(--card-background);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-sm);
+    transition: background-color var(--transition-fast);
+}
+
+    .task-card-content:hover {
+        background-color: var(--background-color);
+    }
+
+.task-node-self {
+    display: flex;
+    align-items: center;
+    border-radius: var(--radius-sm);
+    transition: background-color var(--transition-fast), outline var(--transition-fast), border-color 0.1s;
+    border-top: 3px solid transparent;
+    border-bottom: 3px solid transparent;
+    margin: -3px 0;
+}
+
+.task-card-wrapper {
+    flex-grow: 1;
+}
+
+.expander {
+    width: 24px;
+    text-align: center;
+    cursor: pointer;
+    color: var(--text-muted);
+    user-select: none;
+}
+
+.expander-placeholder {
+    width: 24px;
+}
+
+.task-node-children {
+    padding-left: 0;
+    border-left: 2px solid var(--border-color);
+    margin-left: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.task-title {
+    flex-grow: 1;
+    padding: var(--spacing-xs);
+    font-size: 0.9rem;
+    user-select: none;
+}
+
+.action-btn {
+    opacity: 0;
+    border: none;
+    background: transparent;
+    color: #6b778c;
+    font-size: 1.2rem;
+    cursor: pointer;
+    font-weight: bold;
+    padding: 0 var(--spacing-sm);
+    transition: all var(--transition-fast);
+}
+
+.task-node-self:hover .action-btn {
+    opacity: 1;
+}
+
+.action-btn:hover {
+    color: #172b4d;
+    transform: scale(1.1);
+}
+
+.add-task-btn {
+    width: 100%;
+    text-align: left;
+    padding: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: background-color var(--transition-fast);
+}
+
+    .add-task-btn:hover {
+        background-color: rgba(9,30,66,.08);
+    }
+
+/* --- Task States (Checkbox, Completed, DueDate) --- */
+.task-checkbox {
+    margin-right: 8px;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+.task-card-content.is-completed .task-title {
+    text-decoration: line-through;
+    color: #888;
+}
+
+.task-card-content.is-overdue {
+    border-left: 4px solid #d93737;
+}
+
+.task-card-content.is-due-today {
+    border-left: 4px solid #e67e22;
+}
+
+/* --- Quick Add Input --- */
+.quick-add-container {
+    padding: 2px;
+    margin-top: var(--spacing-sm);
+}
+
+    .quick-add-container.child-add {
+        padding-left: 24px;
+        margin-top: 4px;
+        margin-bottom: 4px;
+    }
+
+/* --- Tree alignment tweaks --- */
+.expander,
+.expander-placeholder {
+    flex: 0 0 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.expander {
+    font-size: 0.9rem;
+    line-height: 1;
+}

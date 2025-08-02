@@ -42,7 +42,7 @@ builder.Services.AddScoped<IGtdBoardJsService, GtdBoardJsService>();
 // 3. Blazor 컴포넌트
 // ------------------------------------------------------------
 builder.Services.AddRazorComponents()
-       .AddInteractiveServerComponents();
+        .AddInteractiveServerComponents();
 
 // ------------------------------------------------------------
 // 4. 애플리케이션 빌드
@@ -119,10 +119,12 @@ app.Use(async (ctx, next) =>
 {
     ctx.Response.Headers["Content-Security-Policy"] =
         "default-src 'self'; " +
-        "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; " +
-        "style-src  'self' 'unsafe-inline'; " +
-        "img-src    'self' data:; " +
-        "connect-src 'self' wss:; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; " +
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+        "style-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+        "font-src 'self' https://cdn.jsdelivr.net data:; " +
+        "img-src 'self' data: blob:; " +
+        "connect-src 'self' wss: ws: https:; " +
         "frame-ancestors 'self';";
     await next();
 });
