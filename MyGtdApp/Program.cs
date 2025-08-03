@@ -43,7 +43,11 @@ builder.Services.AddScoped<IGtdBoardJsService, GtdBoardJsService>();
 // 3. Blazor 컴포넌트
 // ------------------------------------------------------------
 builder.Services.AddRazorComponents()
-        .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents(options =>
+    {
+        options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(10);
+        options.DisconnectedCircuitMaxRetained = 100;
+    });
 
 // ------------------------------------------------------------
 // 4. 애플리케이션 빌드

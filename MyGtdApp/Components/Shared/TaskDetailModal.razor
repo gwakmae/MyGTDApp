@@ -18,21 +18,50 @@
                         <input id="title"
                                class="form-control"
                                @bind="_localTask.Title"
-                               @onkeyup="HandleKeyUp" />
+                               @onkeyup="HandleTitleKeyUp" />
+                    </div>
+
+                    <!-- ✅ Description 필드 -->
+                    <div class="form-group">
+                        <div class="description-header">
+                            <label for="description">Description</label>
+                            <div class="description-tools">
+                                <button type="button" class="btn-tool" @onclick="ClearDescription" title="Clear">
+                                    <i class="bi bi-x-circle"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <textarea id="description"
+                                  class="form-control description-textarea"
+                                  rows="4"
+                                  placeholder="Enter detailed description, notes, or checklist..."
+                                  maxlength="2000"
+                                  @bind="_localTask.Description"
+                                  @oninput="OnDescriptionInput"
+                                  @onkeydown="HandleDescriptionKeyDown"></textarea>
+                        <div class="description-footer">
+                            <small class="description-hint">
+                                <i class="bi bi-info-circle"></i>
+                                Supports multiple lines. Use Ctrl+Enter to save.
+                            </small>
+                            <div class="description-counter @GetCounterClass()">
+                                @(_localTask?.Description?.Length ?? 0) / 2000
+                            </div>
+                        </div>
                     </div>
 
                     <div class="date-group">
                         <div class="form-group">
                             <label for="start-date">Start Date</label>
                             <input id="start-date" type="date" class="form-control"
-                                   value="@(_localTask.StartDate?.ToString("yyyy-MM-dd"))"
-                                   @onchange="(ChangeEventArgs e) => _localTask.StartDate = !string.IsNullOrEmpty(e.Value?.ToString()) ? DateTime.Parse(e.Value.ToString()!) : null" />
+                                   value="@((_localTask != null && _localTask.StartDate.HasValue) ? _localTask.StartDate.Value.ToString("yyyy-MM-dd") : "")"
+                                   @onchange="HandleStartDateChange" />
                         </div>
                         <div class="form-group">
                             <label for="due-date">Due Date</label>
                             <input id="due-date" type="date" class="form-control"
-                                   value="@(_localTask.DueDate?.ToString("yyyy-MM-dd"))"
-                                   @onchange="(ChangeEventArgs e) => _localTask.DueDate = !string.IsNullOrEmpty(e.Value?.ToString()) ? DateTime.Parse(e.Value.ToString()!) : null" />
+                                   value="@((_localTask != null && _localTask.DueDate.HasValue) ? _localTask.DueDate.Value.ToString("yyyy-MM-dd") : "")"
+                                   @onchange="HandleDueDateChange" />
                         </div>
                     </div>
 
@@ -42,7 +71,7 @@
                                class="form-control"
                                placeholder="e.g. @@Home, @@Work"
                                @bind="ContextsString"
-                               @onkeyup="HandleKeyUp" />
+                               @onkeyup="HandleContextsKeyUp" />
                     </div>
 
                     <button type="submit" style="display: none;"></button>
@@ -79,6 +108,7 @@
         {
             Id = TaskToEdit.Id,
             Title = TaskToEdit.Title,
+            Description = TaskToEdit.Description ?? string.Empty, // null 방어
             Priority = TaskToEdit.Priority,
             Status = TaskToEdit.Status,
             ParentId = TaskToEdit.ParentId,
@@ -86,12 +116,12 @@
             IsCompleted = TaskToEdit.IsCompleted,
             StartDate = TaskToEdit.StartDate,
             DueDate = TaskToEdit.DueDate,
-            Contexts = new List<string>(TaskToEdit.Contexts)
+            Contexts = new List<string>(TaskToEdit.Contexts ?? new List<string>()) // null 방어
         };
     }
 
-    // 엔터키 처리 메서드 추가
-    private async Task HandleKeyUp(KeyboardEventArgs e)
+    // Title 입력 필드용 키 핸들러
+    private async Task HandleTitleKeyUp(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
         {
@@ -99,7 +129,52 @@
         }
     }
 
-    // form submit 처리 메서드 추가
+    // Contexts 입력 필드용 키 핸들러
+    private async Task HandleContextsKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await HandleSave();
+        }
+    }
+
+    // Description textarea용 키 핸들러
+    private async Task HandleDescriptionKeyDown(KeyboardEventArgs e)
+    {
+        // Ctrl+Enter로 저장
+        if (e.Key == "Enter" && e.CtrlKey)
+        {
+            await HandleSave();
+        }
+        // Esc로 취소
+        else if (e.Key == "Escape")
+        {
+            await HandleClose();
+        }
+    }
+
+    // 날짜 변경 핸들러들 (null 안전)
+    private void HandleStartDateChange(ChangeEventArgs e)
+    {
+        if (_localTask != null)
+        {
+            _localTask.StartDate = !string.IsNullOrEmpty(e.Value?.ToString())
+                ? DateTime.Parse(e.Value.ToString()!)
+                : null;
+        }
+    }
+
+    private void HandleDueDateChange(ChangeEventArgs e)
+    {
+        if (_localTask != null)
+        {
+            _localTask.DueDate = !string.IsNullOrEmpty(e.Value?.ToString())
+                ? DateTime.Parse(e.Value.ToString()!)
+                : null;
+        }
+    }
+
+    // form submit 처리 메서드
     private async Task HandleFormSubmit()
     {
         await HandleSave();
@@ -120,7 +195,7 @@
 
     private string ContextsString
     {
-        get => _localTask != null ? string.Join(", ", _localTask.Contexts) : "";
+        get => _localTask != null ? string.Join(", ", _localTask.Contexts ?? new List<string>()) : "";
         set
         {
             if (_localTask != null)
@@ -130,5 +205,34 @@
                     : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
             }
         }
+    }
+
+    // Description 실시간 업데이트
+    private void OnDescriptionInput(ChangeEventArgs e)
+    {
+        if (_localTask != null)
+        {
+            _localTask.Description = e.Value?.ToString() ?? "";
+            StateHasChanged();
+        }
+    }
+
+    // Description 내용 지우기
+    private void ClearDescription()
+    {
+        if (_localTask != null)
+        {
+            _localTask.Description = "";
+            StateHasChanged();
+        }
+    }
+
+    // 글자 수에 따른 카운터 스타일
+    private string GetCounterClass()
+    {
+        var length = _localTask?.Description?.Length ?? 0;
+        if (length > 1800) return "danger";
+        if (length > 1500) return "warning";
+        return "";
     }
 }

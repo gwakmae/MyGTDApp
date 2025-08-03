@@ -16,6 +16,9 @@ namespace MyGtdApp.Models
 
         public string Title { get; set; } = string.Empty;
 
+        /// <summary>작업에 대한 상세 설명</summary>
+        public string Description { get; set; } = string.Empty;  // ← 새로 추가
+
         public Priority Priority { get; set; }
 
         public TaskStatus Status { get; set; }

@@ -24,7 +24,58 @@
             <FocusOnNavigate RouteData="routeData" Selector="h1" />
         </Found>
     </Router>
-    <script src="_framework/blazor.web.js"></script>
+
+    <!-- 🚫 기존 스크립트 제거 -->
+    <!-- <script src="_framework/blazor.web.js"></script> -->
+    <!-- ✅ 새로운 통합 솔루션 추가 -->
+    <script src="_framework/blazor.web.js" autostart="false"></script>
+    <script>
+        Blazor.start({
+            reconnectionOptions: {
+                maxRetries: 50,
+                retryIntervalMilliseconds: 2000
+            },
+            configureSignalR: function (builder) {
+                builder.withServerTimeout(120000)
+                       .withKeepAliveInterval(30000);
+            }
+        }).then(() => {
+            let reconnectDelayTimer = null;
+
+            // 재연결 UI 지연 표시
+            const originalShow = Blazor.defaultReconnectionHandler._reconnectionDisplay.show;
+            Blazor.defaultReconnectionHandler._reconnectionDisplay.show = function() {
+                reconnectDelayTimer = setTimeout(() => {
+                    originalShow.call(this);
+                }, 5000); // 5초 지연
+            };
+
+            // 재연결 성공 시 타이머 취소
+            const originalHide = Blazor.defaultReconnectionHandler._reconnectionDisplay.hide;
+            Blazor.defaultReconnectionHandler._reconnectionDisplay.hide = function() {
+                if (reconnectDelayTimer) {
+                    clearTimeout(reconnectDelayTimer);
+                    reconnectDelayTimer = null;
+                }
+                originalHide.call(this);
+            };
+
+            // 최종 실패 시 자동 새로고침
+            Blazor.defaultReconnectionHandler._reconnectCallback = function (d) {
+                document.location.reload();
+            };
+        });
+
+        // 탭 활성화 시 연결 확인
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && Blazor.defaultReconnectionHandler._currentReconnectionProcess) {
+                setTimeout(() => {
+                    document.location.reload();
+                }, 2000);
+            }
+        });
+    </script>
+
     <script src="js/download-helper.js"></script>
 </body>
 
