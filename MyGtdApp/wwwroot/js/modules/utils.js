@@ -59,7 +59,7 @@ export function cancelScheduledUpdate() {
 export function updateDragProgress(element, progress) {
     // progress: 0-1 사이 값
     const scale = 1 + (progress * 0.05);  // 최대 5% 확대
-    const rotation = progress * 2;         // 최대 2도 회전
+    const rotation = progress * 2;        // 최대 2도 회전
 
     element.style.transform = `scale(${scale}) rotate(${rotation}deg)`;
     element.style.filter = `brightness(${1 + progress * 0.1})`;
@@ -98,4 +98,18 @@ export function cleanupDragClasses() {
     } catch (error) {
         console.error("[DRAG] 정리 중 오류:", error);
     }
+}
+
+// ===== 사이드바 관련 유틸리티 =====
+export function isSidebarDragZone(target) {
+    // 사이드바 내부이지만 태스크가 아닌 영역 확인
+    return target.closest('.sidebar') && !target.closest('.task-node-self');
+}
+
+export function calculateSidebarDragProgress(deltaX, maxDistance = 250) {
+    return Math.min(Math.abs(deltaX) / maxDistance, 1);
+}
+
+export function shouldCloseSidebar(deltaX, threshold = -100) {
+    return deltaX < threshold;
 }

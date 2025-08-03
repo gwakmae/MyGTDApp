@@ -132,3 +132,20 @@ main {
         padding: 1rem;
     }
 }
+
+/* 사이드바 드래그 관련 스타일 */
+.sidebar.dragging {
+    transition: none !important;
+}
+
+.sidebar:not(.dragging) {
+    transition: transform .3s cubic-bezier(.4,0,.2,1);
+}
+
+/* 터치 드래그 중 텍스트 선택 방지 */
+.sidebar.is-open {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}

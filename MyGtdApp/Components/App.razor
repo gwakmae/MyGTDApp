@@ -28,6 +28,7 @@
     <!-- 🚫 기존 스크립트 제거 -->
     <!-- <script src="_framework/blazor.web.js"></script> -->
     <!-- ✅ 새로운 통합 솔루션 추가 -->
+    <!-- 🔧 수정된 부분 -->
     <script src="_framework/blazor.web.js" autostart="false"></script>
     <script>
         Blazor.start({
@@ -42,33 +43,42 @@
         }).then(() => {
             let reconnectDelayTimer = null;
 
-            // 재연결 UI 지연 표시
-            const originalShow = Blazor.defaultReconnectionHandler._reconnectionDisplay.show;
-            Blazor.defaultReconnectionHandler._reconnectionDisplay.show = function() {
-                reconnectDelayTimer = setTimeout(() => {
-                    originalShow.call(this);
-                }, 5000); // 5초 지연
-            };
+            // ✅ 안전한 접근으로 수정
+            if (Blazor.defaultReconnectionHandler && Blazor.defaultReconnectionHandler._reconnectionDisplay) {
+                // 재연결 UI 지연 표시
+                const originalShow = Blazor.defaultReconnectionHandler._reconnectionDisplay.show;
+                Blazor.defaultReconnectionHandler._reconnectionDisplay.show = function() {
+                    reconnectDelayTimer = setTimeout(() => {
+                        if (originalShow) originalShow.call(this);
+                    }, 5000); // 5초 지연
+                };
 
-            // 재연결 성공 시 타이머 취소
-            const originalHide = Blazor.defaultReconnectionHandler._reconnectionDisplay.hide;
-            Blazor.defaultReconnectionHandler._reconnectionDisplay.hide = function() {
-                if (reconnectDelayTimer) {
-                    clearTimeout(reconnectDelayTimer);
-                    reconnectDelayTimer = null;
-                }
-                originalHide.call(this);
-            };
+                // 재연결 성공 시 타이머 취소
+                const originalHide = Blazor.defaultReconnectionHandler._reconnectionDisplay.hide;
+                Blazor.defaultReconnectionHandler._reconnectionDisplay.hide = function() {
+                    if (reconnectDelayTimer) {
+                        clearTimeout(reconnectDelayTimer);
+                        reconnectDelayTimer = null;
+                    }
+                    if (originalHide) originalHide.call(this);
+                };
+            }
 
             // 최종 실패 시 자동 새로고침
-            Blazor.defaultReconnectionHandler._reconnectCallback = function (d) {
-                document.location.reload();
-            };
+            if (Blazor.defaultReconnectionHandler) {
+                Blazor.defaultReconnectionHandler._reconnectCallback = function (d) {
+                    document.location.reload();
+                };
+            }
+        }).catch(error => {
+            console.error('Blazor 시작 실패:', error);
         });
 
         // 탭 활성화 시 연결 확인
         document.addEventListener('visibilitychange', function() {
-            if (!document.hidden && Blazor.defaultReconnectionHandler._currentReconnectionProcess) {
+            if (!document.hidden &&
+                Blazor.defaultReconnectionHandler &&
+                Blazor.defaultReconnectionHandler._currentReconnectionProcess) {
                 setTimeout(() => {
                     document.location.reload();
                 }, 2000);
@@ -77,6 +87,7 @@
     </script>
 
     <script src="js/download-helper.js"></script>
+
 </body>
 
 </html>

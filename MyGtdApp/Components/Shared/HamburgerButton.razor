@@ -1,5 +1,6 @@
-﻿@rendermode InteractiveServer
-@inject ISidebarJsService SidebarJs  
+﻿@* HamburgerButton.razor 수정 *@
+@rendermode InteractiveServer
+@inject ISidebarJsService SidebarJs
 
 <button class="sidebar-toggle-btn" @onclick="HandleClick">
     <span class="bi bi-list"></span>
@@ -10,7 +11,7 @@
 
     private async Task HandleClick()
     {
-        bool isOpen = await SidebarJs.ToggleAsync();   // JS 실행 & 결과
-        await OnToggle.InvokeAsync(isOpen);            // 부모(MainLayout)에 전달
+        bool isOpen = await SidebarJs.ToggleAsync();
+        await OnToggle.InvokeAsync(isOpen);
     }
 }

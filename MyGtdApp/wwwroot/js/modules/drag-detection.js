@@ -42,6 +42,12 @@ export function findTaskElementAtPoint(clientX, clientY) {
 
 // ===== 드래그 가능한 요소인지 검사 =====
 export function isDraggableTarget(target) {
+    // 🔧 사이드바 영역에서는 GTD 드래그 비활성화
+    if (target.closest(".sidebar")) {
+        console.log("[DRAG] 사이드바 영역 - GTD 드래그 무시");
+        return false;
+    }
+
     // 버튼 등은 무시
     if (target.closest("button, input[type=checkbox], .sidebar-toggle-btn, .mobile-header")) {
         console.log("[DRAG] 버튼 요소 무시");
