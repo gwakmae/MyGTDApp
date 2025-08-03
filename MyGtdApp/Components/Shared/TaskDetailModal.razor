@@ -1,5 +1,7 @@
 ﻿@using MyGtdApp.Models
+@using MyGtdApp.Services
 @using System.Globalization
+@inject ITaskService TaskService
 
 <div class="modal-backdrop" @onclick="HandleClose">
     <div class="modal-container" @onclick:stopPropagation="true">
@@ -65,13 +67,67 @@
                         </div>
                     </div>
 
+                    <!-- 🆕 개선된 Contexts 필드 -->
                     <div class="form-group">
-                        <label for="contexts">Contexts <small>(comma separated)</small></label>
-                        <input id="contexts"
-                               class="form-control"
-                               placeholder="e.g. @@Home, @@Work"
-                               @bind="ContextsString"
-                               @onkeyup="HandleContextsKeyUp" />
+                        <label>Contexts</label>
+
+                        <!-- 기존 컨텍스트 태그들 -->
+                        @if (availableContexts.Any())
+                        {
+                            <div class="context-tags">
+                                @foreach (var context in availableContexts)
+                                {
+                                    <button type="button"
+                                            class="context-tag @(IsContextSelected(context) ? "selected" : "")"
+                                            @onclick="() => ToggleContext(context)">
+                                        @context
+                                        @if (IsContextSelected(context))
+                                        {
+                                            <i class="bi bi-check-circle-fill"></i>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-circle"></i>
+                                        }
+                                    </button>
+                                }
+                            </div>
+                        }
+                        
+                        <!-- 새 컨텍스트 추가 -->
+                        <div class="new-context-input">
+                            <div class="input-group">
+                                <input type="text"
+                                       class="form-control"
+                                       placeholder="Add new context (e.g., @@Work)"
+                                       @bind="newContextInput"
+                                       @onkeyup="HandleNewContextKeyUp" />
+                                <button type="button"
+                                        class="btn btn-add-context"
+                                        @onclick="AddNewContext"
+                                        disabled="@string.IsNullOrWhiteSpace(newContextInput)">
+                                    <i class="bi bi-plus-circle-fill"></i>
+                                    <span class="btn-add-text">Add</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 선택된 컨텍스트 미리보기 -->
+                        @if (_localTask?.Contexts?.Any() == true)
+                        {
+                            <div class="selected-contexts">
+                                <small class="text-muted">Selected:</small>
+                                @foreach (var context in _localTask.Contexts)
+                                {
+                                    <span class="selected-context-badge">
+                                        @context
+                                        <button type="button" class="remove-context" @onclick="() => RemoveContext(context)">
+                                            <i class="bi bi-x"></i>
+                                        </button>
+                                    </span>
+                                }
+                            </div>
+                        }
                     </div>
 
                     <button type="submit" style="display: none;"></button>
@@ -101,14 +157,17 @@
     public EventCallback OnClose { get; set; }
 
     private TaskItem? _localTask;
+    private List<string> availableContexts = new();
+    private string newContextInput = "";
 
+    // 🔧 수정: async 제거하고 동기로 처리
     protected override void OnParametersSet()
     {
         _localTask = new TaskItem
         {
             Id = TaskToEdit.Id,
             Title = TaskToEdit.Title,
-            Description = TaskToEdit.Description ?? string.Empty, // null 방어
+            Description = TaskToEdit.Description ?? string.Empty,
             Priority = TaskToEdit.Priority,
             Status = TaskToEdit.Status,
             ParentId = TaskToEdit.ParentId,
@@ -116,11 +175,95 @@
             IsCompleted = TaskToEdit.IsCompleted,
             StartDate = TaskToEdit.StartDate,
             DueDate = TaskToEdit.DueDate,
-            Contexts = new List<string>(TaskToEdit.Contexts ?? new List<string>()) // null 방어
+            Contexts = new List<string>(TaskToEdit.Contexts ?? new List<string>())
         };
+
+        // 🔧 수정: InvokeAsync로 감싸서 안전하게 비동기 호출
+        InvokeAsync(LoadAvailableContexts);
     }
 
-    // Title 입력 필드용 키 핸들러
+    // 🆕 별도 메서드로 분리
+    private async Task LoadAvailableContexts()
+    {
+        try
+        {
+            availableContexts = await TaskService.GetAllContextsAsync();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"컨텍스트 로드 실패: {ex.Message}");
+            availableContexts = new List<string>();
+        }
+    }
+
+    // 🆕 컨텍스트 관련 메서드들
+    private bool IsContextSelected(string context)
+    {
+        return _localTask?.Contexts?.Contains(context) == true;
+    }
+
+    private void ToggleContext(string context)
+    {
+        if (_localTask?.Contexts == null) return;
+
+        if (_localTask.Contexts.Contains(context))
+        {
+            _localTask.Contexts.Remove(context);
+        }
+        else
+        {
+            _localTask.Contexts.Add(context);
+        }
+        StateHasChanged();
+    }
+
+    private void RemoveContext(string context)
+    {
+        _localTask?.Contexts?.Remove(context);
+        StateHasChanged();
+    }
+
+    private async Task HandleNewContextKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(newContextInput))
+        {
+            await AddNewContext();
+        }
+    }
+
+    private Task AddNewContext()
+    {
+        if (string.IsNullOrWhiteSpace(newContextInput) || _localTask?.Contexts == null)
+            return Task.CompletedTask;
+
+        var context = newContextInput.Trim();
+
+        // @ 붙이기 (없으면)
+        if (!context.StartsWith("@"))
+        {
+            context = "@" + context;
+        }
+
+        // 중복 체크
+        if (!_localTask.Contexts.Contains(context))
+        {
+            _localTask.Contexts.Add(context);
+
+            // 사용 가능한 컨텍스트 목록에도 추가
+            if (!availableContexts.Contains(context))
+            {
+                availableContexts.Add(context);
+                availableContexts.Sort();
+            }
+        }
+
+        newContextInput = "";
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    // 기존 메서드들...
     private async Task HandleTitleKeyUp(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
@@ -129,31 +272,18 @@
         }
     }
 
-    // Contexts 입력 필드용 키 핸들러
-    private async Task HandleContextsKeyUp(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter")
-        {
-            await HandleSave();
-        }
-    }
-
-    // Description textarea용 키 핸들러
     private async Task HandleDescriptionKeyDown(KeyboardEventArgs e)
     {
-        // Ctrl+Enter로 저장
         if (e.Key == "Enter" && e.CtrlKey)
         {
             await HandleSave();
         }
-        // Esc로 취소
         else if (e.Key == "Escape")
         {
             await HandleClose();
         }
     }
 
-    // 날짜 변경 핸들러들 (null 안전)
     private void HandleStartDateChange(ChangeEventArgs e)
     {
         if (_localTask != null)
@@ -174,7 +304,6 @@
         }
     }
 
-    // form submit 처리 메서드
     private async Task HandleFormSubmit()
     {
         await HandleSave();
@@ -193,21 +322,6 @@
         await OnClose.InvokeAsync();
     }
 
-    private string ContextsString
-    {
-        get => _localTask != null ? string.Join(", ", _localTask.Contexts ?? new List<string>()) : "";
-        set
-        {
-            if (_localTask != null)
-            {
-                _localTask.Contexts = string.IsNullOrWhiteSpace(value)
-                    ? new List<string>()
-                    : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-            }
-        }
-    }
-
-    // Description 실시간 업데이트
     private void OnDescriptionInput(ChangeEventArgs e)
     {
         if (_localTask != null)
@@ -217,7 +331,6 @@
         }
     }
 
-    // Description 내용 지우기
     private void ClearDescription()
     {
         if (_localTask != null)
@@ -227,7 +340,6 @@
         }
     }
 
-    // 글자 수에 따른 카운터 스타일
     private string GetCounterClass()
     {
         var length = _localTask?.Description?.Length ?? 0;

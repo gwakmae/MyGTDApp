@@ -234,3 +234,145 @@
     color: #6c757d;
     font-size: 0.75rem;
 }
+
+/* 컨텍스트 태그 스타일 */
+.context-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.context-tag {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.4rem 0.75rem;
+    border: 1px solid #ced4da;
+    border-radius: 16px;
+    background-color: #fff;
+    color: #495057;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+    .context-tag:hover {
+        border-color: #80bdff;
+        background-color: #f0f8ff;
+    }
+
+    .context-tag.selected {
+        background-color: #007bff;
+        color: white;
+        border-color: #007bff;
+    }
+
+    .context-tag i {
+        font-size: 0.75rem;
+    }
+
+/* 새 컨텍스트 입력 개선 */
+.new-context-input {
+    margin-bottom: 1rem;
+}
+
+.input-group {
+    display: flex;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+    .input-group .form-control {
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+        border-right: none;
+        flex: 1;
+        border: 2px solid #e9ecef;
+        transition: border-color 0.2s ease;
+    }
+
+        .input-group .form-control:focus {
+            border-color: #007bff;
+            box-shadow: none;
+        }
+
+/* 개선된 Add 버튼 스타일 */
+.btn-add-context {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding: 0.75rem 1.25rem;
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    border: 2px solid #007bff;
+    color: white;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-width: 80px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+    .btn-add-context:hover:not(:disabled) {
+        background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
+        border-color: #0056b3;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,123,255,0.2);
+    }
+
+    .btn-add-context:active:not(:disabled) {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(0,123,255,0.2);
+    }
+
+    .btn-add-context:disabled {
+        background: #e9ecef;
+        border-color: #e9ecef;
+        color: #6c757d;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    .btn-add-context i {
+        font-size: 1rem;
+        line-height: 1;
+    }
+
+.btn-add-text {
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+}
+
+/* 포커스 상태에서 버튼도 같이 강조 */
+.input-group .form-control:focus + .btn-add-context:not(:disabled) {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+/* 반응형 - 모바일에서는 텍스트 숨기기 */
+@media (max-width: 576px) {
+    .btn-add-text {
+        display: none;
+    }
+
+    .btn-add-context {
+        min-width: 50px;
+        padding: 0.75rem;
+    }
+
+        .btn-add-context i {
+            font-size: 1.1rem;
+        }
+}
