@@ -155,11 +155,18 @@ public class TaskRepository : ITaskRepository
     public async Task<List<TaskItem>> GetByContextAsync(string context)
     {
         using var contextDb = _dbContextFactory.CreateDbContext();
-        return await contextDb.Tasks
-            .Where(t => !t.IsCompleted && t.Contexts.Contains(context))
+
+        // 완료되지 않은 모든 태스크를 가져온 후 클라이언트에서 필터링
+        var allTasks = await contextDb.Tasks
+            .Where(t => !t.IsCompleted)
+            .ToListAsync();
+
+        // 메모리에서 컨텍스트 필터링
+        return allTasks
+            .Where(t => t.Contexts.Contains(context))
             .OrderBy(t => t.Status)
             .ThenBy(t => t.SortOrder)
-            .ToListAsync();
+            .ToList();
     }
 
     public async Task<List<TaskItem>> GetTodayTasksAsync()

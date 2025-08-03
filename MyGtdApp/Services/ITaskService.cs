@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using TaskStatus = MyGtdApp.Models.TaskStatus; // 모호성 해결
+using TaskStatus = MyGtdApp.Models.TaskStatus;
 
 namespace MyGtdApp.Services
 {
@@ -22,8 +22,7 @@ namespace MyGtdApp.Services
         Task<string> ExportTasksToJsonAsync();
         Task ImportTasksFromJsonAsync(string jsonData);
         Task UpdateTaskExpandStateAsync(int taskId, bool isExpanded);
-
-        // 🆕 추가: 완료된 항목 모두 삭제
         Task DeleteAllCompletedTasksAsync();
+        Task DeleteContextAsync(string context); // 🆕 추가
     }
 }

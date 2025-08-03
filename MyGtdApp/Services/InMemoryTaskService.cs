@@ -247,6 +247,22 @@ namespace MyGtdApp.Services
             NotifyStateChanged();
             return Task.CompletedTask;
         }
+
+        public Task DeleteContextAsync(string context)
+        {
+            // 모든 태스크에서 해당 컨텍스트 제거
+            foreach (var task in _tasks)
+            {
+                if (task.Contexts.Contains(context))
+                {
+                    task.Contexts.Remove(context);
+                }
+            }
+
+            NotifyStateChanged();
+            return Task.CompletedTask;
+        }
+
     }
 
 }

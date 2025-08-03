@@ -29,33 +29,55 @@
 @code {
     private List<string> allContexts = new();
 
-    // 1. 컴포넌트 초기화
     protected override async Task OnInitializedAsync()
     {
-        // OnChange 이벤트 구독
         TaskService.OnChange += HandleDataChange;
-        // 최초 컨텍스트 목록 로드
         await LoadContexts();
     }
 
-    // 2. 컨텍스트 목록을 로드하는 메서드
+    // 🔧 수정: async 키워드 추가 및 에러 처리 강화
+    private async void HandleDataChange()
+    {
+        try
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadContexts();
+                StateHasChanged();
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"NavMenu 업데이트 중 오류: {ex.Message}");
+        }
+    }
+
+    // 🆕 추가: 강제 새로고침 메서드
+    [JSInvokable]
+    public async Task RefreshContexts()
+    {
+        await LoadContexts();
+        StateHasChanged();
+    }
+
     private async Task LoadContexts()
     {
-        allContexts = await TaskService.GetAllContextsAsync();
-    }
-
-    // 3. OnChange 이벤트가 발생했을 때 실행될 핸들러
-    private void HandleDataChange()
-    {
-        // UI 스레드에서 안전하게 실행되도록 InvokeAsync 사용
-        InvokeAsync(async () =>
+        try
         {
-            await LoadContexts(); // 데이터 다시 로드
-            StateHasChanged();    // 화면 갱신 요청
-        });
+            var contexts = await TaskService.GetAllContextsAsync();
+            // 🔧 수정: 참조 비교로 불필요한 업데이트 방지
+            if (!contexts.SequenceEqual(allContexts))
+            {
+                allContexts = contexts;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"컨텍스트 로드 중 오류: {ex.Message}");
+            allContexts = new List<string>();
+        }
     }
 
-    // 4. 컴포넌트가 제거될 때 이벤트 구독 해제 (메모리 누수 방지)
     public void Dispose()
     {
         TaskService.OnChange -= HandleDataChange;

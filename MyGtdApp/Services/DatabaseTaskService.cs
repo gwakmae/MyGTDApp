@@ -49,9 +49,26 @@ public class DatabaseTaskService : ITaskService
 
     public async Task UpdateTaskAsync(TaskItem taskToUpdate)
     {
+        var existingTask = await _repository.GetByIdAsync(taskToUpdate.Id);
+        bool contextsChanged = false;
+
+        if (existingTask != null)
+        {
+            // 컨텍스트 변경 감지
+            contextsChanged = !existingTask.Contexts.SequenceEqual(taskToUpdate.Contexts);
+        }
+
         await _repository.UpdateAsync(taskToUpdate);
+
+        // 🔧 수정: 컨텍스트가 변경된 경우 강제로 이벤트 발생
+        if (contextsChanged)
+        {
+            Console.WriteLine("컨텍스트 변경 감지 - OnChange 이벤트 발생");
+        }
+
         NotifyStateChanged();
     }
+
 
     public async Task MoveTaskAsync(int taskId, TaskStatus newStatus, int? newParentId, int newSortOrder)
     {
@@ -139,6 +156,21 @@ public class DatabaseTaskService : ITaskService
     public async Task DeleteAllCompletedTasksAsync()
     {
         await _repository.DeleteByStatusRecursiveAsync(TaskStatus.Completed);
+        NotifyStateChanged();
+    }
+
+    public async Task DeleteContextAsync(string context)
+    {
+        // 모든 태스크에서 해당 컨텍스트 제거
+        var allTasks = await _repository.GetAllRawAsync();
+        var tasksWithContext = allTasks.Where(t => t.Contexts.Contains(context)).ToList();
+
+        foreach (var task in tasksWithContext)
+        {
+            task.Contexts.Remove(context);
+            await _repository.UpdateAsync(task);
+        }
+
         NotifyStateChanged();
     }
 }

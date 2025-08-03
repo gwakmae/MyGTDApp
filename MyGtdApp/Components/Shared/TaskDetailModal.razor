@@ -2,6 +2,7 @@
 @using MyGtdApp.Services
 @using System.Globalization
 @inject ITaskService TaskService
+@inject IJSRuntime JSRuntime
 
 <div class="modal-backdrop" @onclick="HandleClose">
     <div class="modal-container" @onclick:stopPropagation="true">
@@ -23,7 +24,6 @@
                                @onkeyup="HandleTitleKeyUp" />
                     </div>
 
-                    <!-- ✅ Description 필드 -->
                     <div class="form-group">
                         <div class="description-header">
                             <label for="description">Description</label>
@@ -67,34 +67,42 @@
                         </div>
                     </div>
 
-                    <!-- 🆕 개선된 Contexts 필드 -->
                     <div class="form-group">
-                        <label>Contexts</label>
+                        <div class="contexts-header">
+                            <label>Contexts</label>
+                            <small class="context-help-text">Click to select, right-click or long-press to delete from system</small>
+                        </div>
 
-                        <!-- 기존 컨텍스트 태그들 -->
                         @if (availableContexts.Any())
                         {
                             <div class="context-tags">
                                 @foreach (var context in availableContexts)
                                 {
-                                    <button type="button"
-                                            class="context-tag @(IsContextSelected(context) ? "selected" : "")"
-                                            @onclick="() => ToggleContext(context)">
-                                        @context
-                                        @if (IsContextSelected(context))
-                                        {
-                                            <i class="bi bi-check-circle-fill"></i>
-                                        }
-                                        else
-                                        {
-                                            <i class="bi bi-circle"></i>
-                                        }
-                                    </button>
+                                    <div class="context-tag-wrapper">
+                                        <button type="button"
+                                                class="context-tag @(IsContextSelected(context) ? "selected" : "")"
+                                                @onclick="() => ToggleContext(context)">
+                                            @context
+                                            @if (IsContextSelected(context))
+                                            {
+                                                <i class="bi bi-check-circle-fill"></i>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-circle"></i>
+                                            }
+                                        </button>
+                                        <button type="button"
+                                                class="context-delete-btn"
+                                                @onclick="() => DeleteContext(context)"
+                                                title="Delete '@context' from all tasks">
+                                            <i class="bi bi-x-circle-fill"></i>
+                                        </button>
+                                    </div>
                                 }
                             </div>
                         }
-                        
-                        <!-- 새 컨텍스트 추가 -->
+
                         <div class="new-context-input">
                             <div class="input-group">
                                 <input type="text"
@@ -112,7 +120,6 @@
                             </div>
                         </div>
 
-                        <!-- 선택된 컨텍스트 미리보기 -->
                         @if (_localTask?.Contexts?.Any() == true)
                         {
                             <div class="selected-contexts">
@@ -160,7 +167,6 @@
     private List<string> availableContexts = new();
     private string newContextInput = "";
 
-    // 🔧 수정: async 제거하고 동기로 처리
     protected override void OnParametersSet()
     {
         _localTask = new TaskItem
@@ -178,11 +184,9 @@
             Contexts = new List<string>(TaskToEdit.Contexts ?? new List<string>())
         };
 
-        // 🔧 수정: InvokeAsync로 감싸서 안전하게 비동기 호출
         InvokeAsync(LoadAvailableContexts);
     }
 
-    // 🆕 별도 메서드로 분리
     private async Task LoadAvailableContexts()
     {
         try
@@ -197,7 +201,33 @@
         }
     }
 
-    // 🆕 컨텍스트 관련 메서드들
+    // 🆕 컨텍스트 삭제 관련 메서드들
+    private async Task DeleteContext(string context)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+                $"정말로 '{context}' 컨텍스트를 시스템에서 완전히 삭제하시겠습니까?\n" +
+                "이 컨텍스트를 사용하는 모든 작업에서 제거됩니다.");
+
+        if (!confirmed) return;
+
+        try
+        {
+            // 서비스에 컨텍스트 삭제 요청
+            await TaskService.DeleteContextAsync(context);
+
+            // UI에서도 제거
+            availableContexts.Remove(context);
+            _localTask?.Contexts?.Remove(context);
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"컨텍스트 삭제 중 오류가 발생했습니다: {ex.Message}");
+        }
+    }
+
+    // 기존 컨텍스트 관련 메서드들
     private bool IsContextSelected(string context)
     {
         return _localTask?.Contexts?.Contains(context) == true;
@@ -232,38 +262,60 @@
         }
     }
 
-    private Task AddNewContext()
+    private async Task AddNewContext()
     {
         if (string.IsNullOrWhiteSpace(newContextInput) || _localTask?.Contexts == null)
-            return Task.CompletedTask;
+            return;
 
         var context = newContextInput.Trim();
 
-        // @ 붙이기 (없으면)
         if (!context.StartsWith("@"))
         {
             context = "@" + context;
         }
 
-        // 중복 체크
         if (!_localTask.Contexts.Contains(context))
         {
             _localTask.Contexts.Add(context);
 
-            // 사용 가능한 컨텍스트 목록에도 추가
             if (!availableContexts.Contains(context))
             {
                 availableContexts.Add(context);
                 availableContexts.Sort();
             }
+
+            // 🆕 추가: 즉시 저장하여 NavMenu 업데이트 트리거
+            try
+            {
+                await TaskService.UpdateTaskAsync(_localTask);
+                Console.WriteLine($"새 컨텍스트 '{context}' 즉시 저장됨");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"컨텍스트 저장 중 오류: {ex.Message}");
+                // 오류 시 UI에서 제거
+                _localTask.Contexts.Remove(context);
+                availableContexts.Remove(context);
+            }
         }
 
         newContextInput = "";
         StateHasChanged();
-        return Task.CompletedTask;
+
+        // 🆕 추가: NavMenu 강제 새로고침
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("eval",
+                "document.querySelector('.navmenu') && window.location.reload()");
+        }
+        catch
+        {
+            // JavaScript 오류 무시
+        }
     }
 
-    // 기존 메서드들...
+
+    // 기존 메서드들... (HandleTitleKeyUp, HandleDescriptionKeyDown 등 그대로 유지)
     private async Task HandleTitleKeyUp(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
