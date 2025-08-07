@@ -92,7 +92,7 @@ public class DatabaseTaskService : ITaskService
         {
             var id = stack.Pop();
             var children = (await _repository.GetAllRawAsync())
-                           .Where(c => c.ParentId == id);
+                               .Where(c => c.ParentId == id);
 
             foreach (var c in children)
             {
@@ -139,5 +139,26 @@ public class DatabaseTaskService : ITaskService
             await _repository.UpdateAsync(task);
         }
         NotifyStateChanged();
+    }
+
+    public async Task AddGlobalContextAsync(string context)
+    {
+        // 전역에서 사용할 수 있도록 더미 Task로 컨텍스트만 저장
+        var existingContexts = await GetAllContextsAsync();
+        if (!existingContexts.Contains(context))
+        {
+            // 임시 Task 생성하여 컨텍스트만 저장
+            var dummyTask = new TaskItem
+            {
+                Title = "_CONTEXT_HOLDER_", // 구분용 제목
+                Status = TaskStatus.Completed,
+                IsCompleted = true,
+                Contexts = new List<string> { context }
+            };
+            
+            await _repository.AddAsync(dummyTask);
+            NotifyStateChanged();
+            Console.WriteLine($"전역 컨텍스트 '{context}' 추가됨");
+        }
     }
 }

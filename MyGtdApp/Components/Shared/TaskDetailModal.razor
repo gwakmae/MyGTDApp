@@ -4,6 +4,8 @@
 @inject ITaskService TaskService
 @inject IJSRuntime JSRuntime
 
+@implements IAsyncDisposable
+
 <div class="modal-backdrop" @onclick="HandleClose">
     <div class="modal-container" @onclick:stopPropagation="true">
 
@@ -187,6 +189,15 @@
         InvokeAsync(LoadAvailableContexts);
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // 모달 열릴 때 백그라운드 스크롤 차단
+            await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", true);
+        }
+    }
+
     private async Task LoadAvailableContexts()
     {
         try
@@ -254,66 +265,40 @@
         StateHasChanged();
     }
 
-    private async Task HandleNewContextKeyUp(KeyboardEventArgs e)
+    // 🔧 수정: async 제거하고 await 제거
+    private void HandleNewContextKeyUp(KeyboardEventArgs e)
     {
         if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(newContextInput))
         {
-            await AddNewContext();
+            AddNewContext(); // ← await 제거됨
         }
     }
 
-    private async Task AddNewContext()
+    // 🔧 수정: 새 컨텍스트는 선택 목록에만 추가, 즉시 저장하지 않음
+    private void AddNewContext()
     {
-        if (string.IsNullOrWhiteSpace(newContextInput) || _localTask?.Contexts == null)
+        if (string.IsNullOrWhiteSpace(newContextInput))
             return;
 
         var context = newContextInput.Trim();
-
         if (!context.StartsWith("@"))
         {
             context = "@" + context;
         }
 
-        if (!_localTask.Contexts.Contains(context))
+        // 🔧 핵심: availableContexts에만 추가, Task에는 자동 적용하지 않음
+        if (!availableContexts.Contains(context))
         {
-            _localTask.Contexts.Add(context);
-
-            if (!availableContexts.Contains(context))
-            {
-                availableContexts.Add(context);
-                availableContexts.Sort();
-            }
-
-            // 🆕 추가: 즉시 저장하여 NavMenu 업데이트 트리거
-            try
-            {
-                await TaskService.UpdateTaskAsync(_localTask);
-                Console.WriteLine($"새 컨텍스트 '{context}' 즉시 저장됨");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"컨텍스트 저장 중 오류: {ex.Message}");
-                // 오류 시 UI에서 제거
-                _localTask.Contexts.Remove(context);
-                availableContexts.Remove(context);
-            }
+            availableContexts.Add(context);
+            availableContexts.Sort();
+            Console.WriteLine($"새 컨텍스트 '{context}' 선택 목록에 추가됨");
         }
 
         newContextInput = "";
         StateHasChanged();
 
-        // 🆕 추가: NavMenu 강제 새로고침
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("eval",
-                "document.querySelector('.navmenu') && window.location.reload()");
-        }
-        catch
-        {
-            // JavaScript 오류 무시
-        }
+        // ❌ 제거: 자동 적용 및 즉시 저장 코드 모두 제거
     }
-
 
     // 기존 메서드들... (HandleTitleKeyUp, HandleDescriptionKeyDown 등 그대로 유지)
     private async Task HandleTitleKeyUp(KeyboardEventArgs e)
@@ -365,12 +350,14 @@
     {
         if (_localTask != null)
         {
+            await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", false);
             await OnSave.InvokeAsync(_localTask);
         }
     }
 
     private async Task HandleClose()
     {
+        await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", false);
         await OnClose.InvokeAsync();
     }
 
@@ -398,5 +385,22 @@
         if (length > 1800) return "danger";
         if (length > 1500) return "warning";
         return "";
+    }
+
+    // IAsyncDisposable 구현
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", false);
+        }
+        catch (JSDisconnectedException)
+        {
+            // 연결 해제 시 무시
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"모달 해제 중 오류: {ex.Message}");
+        }
     }
 }
