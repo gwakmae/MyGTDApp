@@ -111,6 +111,7 @@
                                        class="form-control"
                                        placeholder="Add new context (e.g., @@Work)"
                                        @bind="newContextInput"
+                                       @onkeydown="HandleNewContextKeyDown"
                                        @onkeyup="HandleNewContextKeyUp" />
                                 <button type="button"
                                         class="btn btn-add-context"
@@ -195,6 +196,16 @@
         {
             // 모달 열릴 때 백그라운드 스크롤 차단
             await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", true);
+
+            // 🆕 추가: 컨텍스트 입력 핸들링 설정
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("setupContextInputHandling");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"컨텍스트 입력 핸들링 설정 실패: {ex.Message}");
+            }
         }
     }
 
@@ -265,15 +276,40 @@
         StateHasChanged();
     }
 
-    // 🔧 수정: async 제거하고 await 제거
-    private void HandleNewContextKeyUp(KeyboardEventArgs e)
+    // 🆕 추가: 키다운 이벤트 핸들러 (엔터키 기본 동작 방지)
+    private void HandleNewContextKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(newContextInput))
+        if (e.Key == "Enter")
         {
-            AddNewContext(); // ← await 제거됨
+            // 엔터키의 기본 동작(폼 제출) 방지
+            // Blazor에서는 preventDefault를 직접 호출할 수 없으므로
+            // 대신 키업 이벤트에서 처리하고 여기서는 로깅만
+            Console.WriteLine("[CONTEXT] 엔터키 감지 - 키업에서 처리 예정");
         }
     }
 
+    // 🔧 수정: 키업 이벤트 핸들러 개선
+    private async Task HandleNewContextKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(newContextInput))
+        {
+            Console.WriteLine("[CONTEXT] 엔터키로 새 컨텍스트 추가 실행");
+            
+            // 엔터키로 컨텍스트 추가
+            AddNewContext();
+            
+            // 추가 후 입력 필드에 다시 포커스 (모바일에서 키보드 유지)
+            await Task.Delay(100); // 짧은 지연으로 DOM 업데이트 대기
+            StateHasChanged();
+        }
+        else if (e.Key == "Escape")
+        {
+            // ESC 키로 입력 취소
+            newContextInput = "";
+            StateHasChanged();
+        }
+    }
+    
     // 🔧 수정: 새 컨텍스트는 선택 목록에만 추가, 즉시 저장하지 않음
     private void AddNewContext()
     {

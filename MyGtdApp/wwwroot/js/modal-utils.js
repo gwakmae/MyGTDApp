@@ -38,3 +38,19 @@ window.preventBackgroundScroll = function(prevent) {
         console.log('[MODAL] 백그라운드 스크롤 복원됨');
     }
 };
+
+// 컨텍스트 입력 필드에서 엔터키 처리 개선
+window.setupContextInputHandling = function() {
+    document.addEventListener('keydown', function(e) {
+        // 새 컨텍스트 입력 필드에서 엔터키가 눌린 경우
+        if (e.target.matches('.new-context-input input') && e.key === 'Enter') {
+            e.preventDefault(); // 폼 제출 방지
+            console.log('[CONTEXT INPUT] 엔터키 기본 동작 방지됨');
+        }
+    });
+};
+
+// 모달이 열릴 때 자동 실행
+document.addEventListener('DOMContentLoaded', function() {
+    window.setupContextInputHandling();
+});
