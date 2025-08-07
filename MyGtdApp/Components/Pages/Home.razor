@@ -16,7 +16,6 @@
 {
     <div class="main-header modern-header">
         <div class="header-content">
-            <!-- 로고 섹션 -->
             <div class="header-left">
                 <div class="app-logo">
                     <div class="logo-icon">
@@ -29,7 +28,6 @@
                 </div>
             </div>
 
-            <!-- 통계 섹션 -->
             <div class="header-center">
                 <div class="header-stats">
                     <div class="stat-item">
@@ -44,7 +42,6 @@
                 </div>
             </div>
 
-            <!-- 버튼 섹션 -->
             <div class="header-right">
                 <DataManager class="data-manager board-header" />
                 <button class="btn btn-modern btn-hide-completed"
@@ -64,8 +61,12 @@
             <div class="task-list">
                 @foreach (var task in FilterCompleted(todayTasks))
                 {
+                    @* 🔄 수정: 다중 선택 관련 파라미터 전달 *@
                     <ProjectTaskNode @key="task.Id"
                                      Task="task"
+                                     IsSelected="selectedTaskIds.Contains(task.Id)"
+                                     SelectedTaskIds="selectedTaskIds"
+                                     OnClick="(args) => HandleTaskClick(args.taskId, args.e)"
                                      HideCompleted="hideCompleted"
                                      OnTaskAdded="HandleTaskAdded"
                                      OnTaskDeleted="HandleDeleteTask"
@@ -108,8 +109,12 @@
                 <div class="task-list">
                     @foreach (var task in FilterCompleted(GetTasksForStatus(status)))
                     {
+                        @* 🔄 수정: 다중 선택 관련 파라미터 전달 *@
                         <ProjectTaskNode @key="task.Id"
                                          Task="task"
+                                         IsSelected="selectedTaskIds.Contains(task.Id)"
+                                         SelectedTaskIds="selectedTaskIds"
+                                         OnClick="(args) => HandleTaskClick(args.taskId, args.e)"
                                          HideCompleted="hideCompleted"
                                          OnTaskAdded="HandleTaskAdded"
                                          OnTaskDeleted="HandleDeleteTask"
@@ -157,8 +162,12 @@ else
     <div class="context-view-container">
         @foreach (var task in FilterCompleted(contextTasks))
         {
+            @* 🔄 수정: 다중 선택 관련 파라미터 전달 *@
             <ProjectTaskNode @key="task.Id"
                              Task="task"
+                             IsSelected="selectedTaskIds.Contains(task.Id)"
+                             SelectedTaskIds="selectedTaskIds"
+                             OnClick="(args) => HandleTaskClick(args.taskId, args.e)"
                              HideCompleted="hideCompleted"
                              OnTaskAdded="HandleTaskAdded"
                              OnTaskDeleted="HandleDeleteTask"

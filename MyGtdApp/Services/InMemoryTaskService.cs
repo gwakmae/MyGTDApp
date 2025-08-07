@@ -3,8 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Text.Json; // 추가됨
-using System.Text.Json.Serialization; // 추가됨
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MyGtdApp.Services
 {
@@ -83,25 +83,23 @@ namespace MyGtdApp.Services
             }
             return Task.CompletedTask;
         }
-
-        // [수정됨] ToggleCompleteStatusAsync 메서드
+        
         public Task ToggleCompleteStatusAsync(int taskId)
         {
             var task = _tasks.FirstOrDefault(t => t.Id == taskId);
             if (task != null)
             {
-                if (!task.IsCompleted) // 완료로 변경하는 경우
+                if (!task.IsCompleted)
                 {
-                    task.OriginalStatus = task.Status; // 원본 상태 저장
+                    task.OriginalStatus = task.Status;
                     task.IsCompleted = true;
                     task.Status = Models.TaskStatus.Completed;
                 }
-                else // 완료 해제하는 경우
+                else
                 {
                     task.IsCompleted = false;
-                    // 원본 상태가 있으면 복원, 없으면 NextActions로 기본값
                     task.Status = task.OriginalStatus ?? Models.TaskStatus.NextActions;
-                    task.OriginalStatus = null; // 복원 후 초기화
+                    task.OriginalStatus = null;
                 }
                 NotifyStateChanged();
             }
@@ -116,7 +114,6 @@ namespace MyGtdApp.Services
                 var childrenToDelete = _tasks.Where(t => t.ParentId == taskId).ToList();
                 foreach (var child in childrenToDelete)
                 {
-                    // 자식 항목을 재귀적으로 삭제
                     _ = DeleteTaskAsync(child.Id);
                 }
                 _tasks.Remove(taskToDelete);
@@ -127,24 +124,56 @@ namespace MyGtdApp.Services
 
         public Task MoveTaskAsync(int taskId, Models.TaskStatus newStatus, int? newParentId, int newSortOrder)
         {
-            var taskToMove = _tasks.FirstOrDefault(t => t.Id == taskId);
-            if (taskToMove != null)
+            // 🔄 수정: 단일 이동을 다중 이동 로직으로 통합하여 처리
+            return MoveTasksAsync(new List<int> { taskId }, newStatus, newParentId, newSortOrder);
+        }
+
+        // 🆕 추가: 다중 이동을 위한 `MoveTasksAsync` 구현
+        public Task MoveTasksAsync(List<int> taskIds, Models.TaskStatus newStatus, int? newParentId, int newSortOrder)
+        {
+            if (taskIds == null || !taskIds.Any()) return Task.CompletedTask;
+
+            var tasksToMove = _tasks.Where(t => taskIds.Contains(t.Id)).ToList();
+            if (!tasksToMove.Any()) return Task.CompletedTask;
+            
+            // 기존 위치 정리
+            var tasksByOldParent = tasksToMove.GroupBy(t => new { t.ParentId, t.Status });
+            foreach (var group in tasksByOldParent)
             {
-                var oldParentId = taskToMove.ParentId;
-                var oldStatus = taskToMove.Status;
-                if (oldParentId != taskToMove.ParentId || oldStatus != taskToMove.Status)
-                {
-                    var sourceSiblings = _tasks.Where(t => t.ParentId == oldParentId && t.Status == oldStatus && t.Id != taskId).OrderBy(t => t.SortOrder).ToList();
-                    for (int i = 0; i < sourceSiblings.Count; i++) { sourceSiblings[i].SortOrder = i; }
-                }
-                taskToMove.ParentId = newParentId;
-                taskToMove.Status = newStatus;
-                var destinationSiblings = _tasks.Where(t => t.ParentId == newParentId && t.Status == newStatus && t.Id != taskId).OrderBy(t => t.SortOrder).ToList();
-                newSortOrder = Math.Clamp(newSortOrder, 0, destinationSiblings.Count);
-                destinationSiblings.Insert(newSortOrder, taskToMove);
-                for (int i = 0; i < destinationSiblings.Count; i++) { destinationSiblings[i].SortOrder = i; }
-                NotifyStateChanged();
+                var remainingSiblings = _tasks
+                    .Where(t => t.ParentId == group.Key.ParentId && t.Status == group.Key.Status && !taskIds.Contains(t.Id))
+                    .OrderBy(t => t.SortOrder).ToList();
+                for (int i = 0; i < remainingSiblings.Count; i++) remainingSiblings[i].SortOrder = i;
             }
+
+            // 새 위치에 삽입 및 정렬
+            var newSiblings = _tasks
+                .Where(t => t.ParentId == newParentId && t.Status == newStatus && !taskIds.Contains(t.Id))
+                .OrderBy(t => t.SortOrder).ToList();
+            
+            newSortOrder = Math.Clamp(newSortOrder, 0, newSiblings.Count);
+
+            // 이동할 작업들을 새 위치에 삽입
+            var currentOrder = newSortOrder;
+            foreach (var task in tasksToMove.OrderBy(t=>t.SortOrder))
+            {
+                task.ParentId = newParentId;
+                task.Status = newStatus;
+                // 실제 삽입은 나중에 한번에 처리
+            }
+
+            // 전체 목록을 기준으로 정렬
+            var allDestinationSiblings = new List<TaskItem>();
+            allDestinationSiblings.AddRange(newSiblings);
+            allDestinationSiblings.InsertRange(newSortOrder, tasksToMove);
+
+            // 최종 순서 부여
+            for (int i = 0; i < allDestinationSiblings.Count; i++)
+            {
+                allDestinationSiblings[i].SortOrder = i;
+            }
+
+            NotifyStateChanged();
             return Task.CompletedTask;
         }
 
@@ -181,23 +210,19 @@ namespace MyGtdApp.Services
             return Task.FromResult(result);
         }
 
-        // 추가됨: 데이터 내보내기 메서드
         public Task<string> ExportTasksToJsonAsync()
         {
             var exportData = new { tasks = _tasks };
-
             var options = new JsonSerializerOptions
             {
                 WriteIndented = true,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                 Converters = { new JsonStringEnumConverter() }
             };
-
             var json = JsonSerializer.Serialize(exportData, options);
             return Task.FromResult(json);
         }
 
-        // 추가됨: 데이터 가져오기 메서드
         public Task ImportTasksFromJsonAsync(string jsonData)
         {
             var options = new JsonSerializerOptions
@@ -205,19 +230,13 @@ namespace MyGtdApp.Services
                 PropertyNameCaseInsensitive = true,
                 Converters = { new JsonStringEnumConverter() }
             };
-
             var importData = JsonSerializer.Deserialize<JsonTaskHelper>(jsonData, options);
 
             if (importData?.Tasks != null && importData.Tasks.Any())
             {
                 _tasks.Clear();
                 _tasks.AddRange(importData.Tasks);
-
-                if (_tasks.Any())
-                {
-                    _nextId = _tasks.Max(t => t.Id) + 1;
-                }
-
+                if (_tasks.Any()) _nextId = _tasks.Max(t => t.Id) + 1;
                 NotifyStateChanged();
             }
 
@@ -227,42 +246,26 @@ namespace MyGtdApp.Services
         public Task UpdateTaskExpandStateAsync(int taskId, bool isExpanded)
         {
             var task = _tasks.FirstOrDefault(t => t.Id == taskId);
-            if (task != null)
-            {
-                task.IsExpanded = isExpanded;
-            }
+            if (task != null) task.IsExpanded = isExpanded;
             return Task.CompletedTask;
         }
-
-        // 🆕 추가: 완료된 항목 모두 삭제
+        
         public Task DeleteAllCompletedTasksAsync()
         {
             var completedTasks = _tasks.Where(t => t.Status == Models.TaskStatus.Completed).ToList();
-
-            foreach (var task in completedTasks)
-            {
-                _tasks.Remove(task);
-            }
-
+            foreach (var task in completedTasks) _tasks.Remove(task);
             NotifyStateChanged();
             return Task.CompletedTask;
         }
 
         public Task DeleteContextAsync(string context)
         {
-            // 모든 태스크에서 해당 컨텍스트 제거
             foreach (var task in _tasks)
             {
-                if (task.Contexts.Contains(context))
-                {
-                    task.Contexts.Remove(context);
-                }
+                if (task.Contexts.Contains(context)) task.Contexts.Remove(context);
             }
-
             NotifyStateChanged();
             return Task.CompletedTask;
         }
-
     }
-
 }

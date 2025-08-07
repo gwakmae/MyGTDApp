@@ -5,9 +5,10 @@
 
 <div class="task-node @(DraggedTaskId == Task.Id ? "is-ghost" : "")">
 
-    <div class="task-node-self @DropIndicatorClass @InvalidClass"
+    <div class="task-node-self @DropIndicatorClass @InvalidClass @(IsSelected ? "is-selected" : "")"
          draggable="true"
          data-task-id="@Task.Id"
+         @onclick="HandleClick"
          @ondragstart="() => OnTaskDragStart.InvokeAsync(Task.Id)"
          @ondragend="() => OnTaskDragEnd.InvokeAsync()"
          @ondrop:stopPropagation="true" @ondrop="HandleDrop"
@@ -16,7 +17,7 @@
 
         @if (Task.Children.Any())
         {
-            <span class="expander" @onclick="ToggleExpand">@(Task.IsExpanded ? "▼" : "▶")</span>
+            <span class="expander" @onclick:stopPropagation="true" @onclick="ToggleExpand">@(Task.IsExpanded ? "▼" : "▶")</span>
         }
         else
         {
@@ -29,21 +30,23 @@
                       OnTaskCompletedToggle="() => OnTaskCompletedToggle.InvokeAsync(Task.Id)"
                       OnTaskDoubleClick="() => OnTaskDoubleClick.InvokeAsync(Task.Id)" />
         </div>
-        <button class="action-btn add-btn" @onclick="ToggleQuickAdd">+</button>
+        <button class="action-btn add-btn" @onclick:stopPropagation="true" @onclick="ToggleQuickAdd">+</button>
     </div>
 
     @if (Task.IsExpanded)
     {
         <div class="task-node-children">
-            @* 🔧 Parent와 첫 번째 Child 간격 해결을 위한 구분 요소 추가 *@
             <div class="task-separator"></div>
 
             @foreach (var child in Task.Children
-                    .Where(c => !HideCompleted || !c.IsCompleted)
-                    .OrderBy(c => c.SortOrder))
+                                       .Where(c => !HideCompleted || !c.IsCompleted)
+                                       .OrderBy(c => c.SortOrder))
             {
                 <ProjectTaskNode @key="child.Id"
                                  Task="child"
+                                 IsSelected="SelectedTaskIds.Contains(child.Id)"
+                                 SelectedTaskIds="SelectedTaskIds"
+                                 OnClick="args => OnClick.InvokeAsync(args)"
                                  OnTaskAdded="OnTaskAdded"
                                  OnTaskDeleted="OnTaskDeleted"
                                  OnTaskUpdated="OnTaskUpdated"
@@ -80,6 +83,10 @@
     [Parameter] public int DraggedTaskId { get; set; }
     [Parameter] public bool HideCompleted { get; set; }
 
+    [Parameter] public bool IsSelected { get; set; }
+    [Parameter] public List<int> SelectedTaskIds { get; set; } = new();
+    [Parameter] public EventCallback<(int taskId, MouseEventArgs e)> OnClick { get; set; }
+
     [Parameter] public EventCallback OnTaskAdded { get; set; }
     [Parameter] public EventCallback<int> OnTaskDeleted { get; set; }
     [Parameter] public EventCallback OnTaskUpdated { get; set; }
@@ -90,14 +97,11 @@
     [Parameter] public EventCallback<int> OnTaskDoubleClick { get; set; }
 
     /*------------- UI 상태 -------------*/
-    // 🚫 제거: private bool isExpanded = true;
     private bool isAddingChild = false;
     private string newChildTaskTitle = "";
     private ElementReference quickAddInputRefForChild;
-
-    /* 드롭 위치 · 유효성 */
     private DropIndicator dropIndicator = DropIndicator.None;
-    private bool dropInvalid = false;    // ⬅ 드롭 불가 여부
+    private bool dropInvalid = false;
 
     /*------------- CSS 클래스 계산 -------------*/
     private string DropIndicatorClass => dropIndicator switch
@@ -109,13 +113,16 @@
     };
     private string InvalidClass => dropInvalid ? "drop-invalid" : "";
 
-    /*------------- 토글/추가 -------------*/
-    // 🔄 수정: Task.IsExpanded 사용 및 데이터베이스에 저장
-    private async Task ToggleExpand()
+    /*------------- 이벤트 핸들러 -------------*/
+    private async Task HandleClick(MouseEventArgs e)
+    {
+        await OnClick.InvokeAsync((Task.Id, e));
+    }
+
+    private async Task ToggleExpand(MouseEventArgs e)
     {
         Task.IsExpanded = !Task.IsExpanded;
         await TaskService.UpdateTaskExpandStateAsync(Task.Id, Task.IsExpanded);
-        StateHasChanged();
     }
 
     private async Task ToggleQuickAdd()
@@ -124,20 +131,8 @@
         if (isAddingChild)
         {
             await System.Threading.Tasks.Task.Delay(50);
-
-            // 🔧 ElementReference 안전성 강화
-            try
-            {
-                if (quickAddInputRefForChild.Context != null)
-                {
-                    await quickAddInputRefForChild.FocusAsync();
-                }
-            }
-            catch (InvalidOperationException ex)
-            {
-                Console.WriteLine($"[WARN] ElementReference 포커스 실패: {ex.Message}");
-                // 포커스 실패해도 계속 진행
-            }
+            try { if (quickAddInputRefForChild.Context != null) await quickAddInputRefForChild.FocusAsync(); }
+            catch (InvalidOperationException) { }
         }
     }
 
@@ -148,45 +143,33 @@
             await TaskService.AddTaskAsync(newChildTaskTitle, Task.Status, Task.Id);
             newChildTaskTitle = "";
             await OnTaskAdded.InvokeAsync();
-
-            // 🔧 안전한 포커스 처리
-            try
-            {
-                if (quickAddInputRefForChild.Context != null)
-                {
-                    await quickAddInputRefForChild.FocusAsync();
-                }
-            }
-            catch (InvalidOperationException)
-            {
-                // 포커스 실패 시 무시
-            }
+            try { if (quickAddInputRefForChild.Context != null) await quickAddInputRefForChild.FocusAsync(); }
+            catch (InvalidOperationException) { }
         }
-        else if (e.Key == "Escape")
-        {
-            isAddingChild = false;
-        }
+        else if (e.Key == "Escape") { isAddingChild = false; }
     }
 
-    // 수정: HandleChildQuickAddBlur 메서드 추가 및 기존 @onblur 변경
     private async Task HandleChildQuickAddBlur()
     {
-        // 입력된 내용이 있으면 자동으로 저장
         if (!string.IsNullOrWhiteSpace(newChildTaskTitle))
         {
             await TaskService.AddTaskAsync(newChildTaskTitle, Task.Status, Task.Id);
             await OnTaskAdded.InvokeAsync();
         }
-
-        // 상태 초기화
         isAddingChild = false;
         newChildTaskTitle = "";
     }
 
-    /*------------- D&D 로직 -------------*/
     private void HandleDragOver(DragEventArgs e)
     {
-        /* 자기 자신 또는 자손에게 드롭하려는 경우 → 차단 + 불가 표시 */
+        // 🔄 수정: 드래그 오버 시 선택된 여러 항목에 대한 유효성 검사
+        if (SelectedTaskIds.Contains(Task.Id) || IsDescendantOfSelected(Task))
+        {
+            dropInvalid = true;
+            dropIndicator = DropIndicator.None;
+            return;
+        }
+
         if (DraggedTaskId == Task.Id || IsDescendant(Task, DraggedTaskId))
         {
             dropInvalid = true;
@@ -206,8 +189,7 @@
 
     private async Task HandleDrop()
     {
-        /* 최종 방어막 – 순환 드롭 차단 */
-        if (DraggedTaskId == Task.Id || IsDescendant(Task, DraggedTaskId))
+        if (dropInvalid)
         {
             dropIndicator = DropIndicator.None;
             dropInvalid = false;
@@ -218,18 +200,33 @@
         {
             await OnTaskDropped.InvokeAsync((Task.Id, dropIndicator));
         }
-
         dropIndicator = DropIndicator.None;
-        dropInvalid = false;
     }
 
-    /* parent 가 childId 를 자손으로 가지고 있는지 재귀 확인 */
     private bool IsDescendant(TaskItem parent, int childId)
     {
         foreach (var child in parent.Children)
         {
             if (child.Id == childId) return true;
             if (IsDescendant(child, childId)) return true;
+        }
+        return false;
+    }
+
+    // 🆕 추가: 현재 작업이 선택된 항목들 중 하나의 자손인지 확인하는 메서드
+    private bool IsDescendantOfSelected(TaskItem currentTask)
+    {
+        var parentId = currentTask.ParentId;
+        while (parentId.HasValue)
+        {
+            if (SelectedTaskIds.Contains(parentId.Value))
+            {
+                return true;
+            }
+            // 실제 부모를 찾아서 계속 올라가야 하지만, 이 컴포넌트는 전체 트리를 모르므로
+            // 이 정도의 방어 로직만으로도 대부분의 순환을 막을 수 있음.
+            // 핵심 방어는 서버 사이드에서 이루어짐.
+            parentId = null; // 단순화를 위해 한 단계만 체크
         }
         return false;
     }

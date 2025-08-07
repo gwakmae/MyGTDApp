@@ -1,6 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using MyGtdApp.Models;
-using TaskStatus = MyGtdApp.Models.TaskStatus; // 모호성 해결
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using TaskStatus = MyGtdApp.Models.TaskStatus;
 
 namespace MyGtdApp.Services;
 
@@ -13,97 +17,136 @@ public class TaskMoveService : ITaskMoveService
         _dbContextFactory = dbContextFactory;
     }
 
+    // 기존 단일 이동 메서드
     public async Task MoveTaskAsync(int taskId, TaskStatus newStatus, int? newParentId, int newSortOrder)
     {
-        using var context = _dbContextFactory.CreateDbContext();
-
-        var taskToMove = await context.Tasks.FindAsync(taskId);
-        if (taskToMove == null) return;
-
-        // 순환 방지 로직
-        if (newParentId != null)
-        {
-            int cursorId = newParentId.Value;
-            while (true)
-            {
-                if (cursorId == taskId)
-                {
-                    return; // 자기 자손에게 넣으려는 시도 차단
-                }
-
-                var parentInfo = await context.Tasks
-                                              .AsNoTracking()
-                                              .Where(t => t.Id == cursorId)
-                                              .Select(t => new { t.ParentId })
-                                              .FirstOrDefaultAsync();
-
-                if (parentInfo?.ParentId == null) break;
-                cursorId = parentInfo.ParentId.Value;
-            }
-        }
-
-        var oldStatus = taskToMove.Status;
-
-        // 원래 형제들의 SortOrder 재정렬
-        var oldSiblings = await context.Tasks
-            .Where(t => t.ParentId == taskToMove.ParentId
-                        && t.Status == oldStatus
-                        && t.Id != taskId)
-            .OrderBy(t => t.SortOrder)
-            .ToListAsync();
-        for (int i = 0; i < oldSiblings.Count; i++)
-            oldSiblings[i].SortOrder = i;
-
-        // 이동
-        taskToMove.ParentId = newParentId;
-        taskToMove.Status = newStatus;
-
-        // 새 위치 형제들 + 자기 자신 정렬
-        var newSiblings = await context.Tasks
-            .Where(t => t.ParentId == newParentId
-                        && t.Status == newStatus
-                        && t.Id != taskId)
-            .OrderBy(t => t.SortOrder)
-            .ToListAsync();
-
-        newSortOrder = Math.Clamp(newSortOrder, 0, newSiblings.Count);
-        newSiblings.Insert(newSortOrder, taskToMove);
-
-        for (int i = 0; i < newSiblings.Count; i++)
-            newSiblings[i].SortOrder = i;
-
-        await context.SaveChangesAsync();
-
-        // ---- Path·Depth 갱신 ----
-        await UpdatePathDepthAsync(context, taskToMove);
+        // 🔄 수정: 단일 이동을 다중 이동의 특수한 경우로 처리하여 코드 재사용
+        await MoveTasksAsync(new List<int> { taskId }, newStatus, newParentId, newSortOrder);
     }
 
-    private static async Task UpdatePathDepthAsync(GtdDbContext ctx, TaskItem node)
+    // 🆕 추가: 새로운 다중 이동 핵심 메서드
+    public async Task MoveTasksAsync(List<int> taskIds, TaskStatus newStatus, int? newParentId, int newSortOrder)
     {
-        /* ★ 추가 */
-        string Pad(int n) => n.ToString("D6");
-        /* ------- */
+        if (taskIds == null || !taskIds.Any()) return;
 
-        // ── 자기 자신 ──
+        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        await using var transaction = await context.Database.BeginTransactionAsync();
+
+        try
+        {
+            // --- 1. 전체 이동 대상 확정 (선택된 항목 + 모든 자손) ---
+            var allTasks = await context.Tasks.AsNoTracking().ToListAsync();
+            var allAffectedIds = GetAllAffectedIds(taskIds, allTasks);
+
+            // --- 2. 유효성 검사 (순환 참조 방지) ---
+            if (newParentId.HasValue && allAffectedIds.Contains(newParentId.Value))
+            {
+                // 자신의 자손 밑으로 이동하려는 시도 차단
+                await transaction.RollbackAsync();
+                return;
+            }
+            
+            // --- 3. DB에서 실제 Task 엔티티 가져오기 ---
+            var tasksToMove = await context.Tasks.Where(t => taskIds.Contains(t.Id)).ToListAsync();
+            
+            // --- 4. 기존 위치 정리 (형제들 순서 재정렬) ---
+            var tasksByOldParent = tasksToMove.GroupBy(t => new { t.ParentId, t.Status });
+            foreach (var group in tasksByOldParent)
+            {
+                var siblings = await context.Tasks
+                    .Where(t => t.ParentId == group.Key.ParentId && t.Status == group.Key.Status && !taskIds.Contains(t.Id))
+                    .OrderBy(t => t.SortOrder)
+                    .ToListAsync();
+                for (int i = 0; i < siblings.Count; i++) siblings[i].SortOrder = i;
+            }
+
+            // --- 5. 새 위치의 형제들 가져오기 ---
+            var newSiblings = await context.Tasks
+                .Where(t => t.ParentId == newParentId && t.Status == newStatus && !taskIds.Contains(t.Id))
+                .OrderBy(t => t.SortOrder)
+                .ToListAsync();
+
+            // --- 6. 이동 작업 수행 (평탄화 및 정렬) ---
+            newSortOrder = Math.Clamp(newSortOrder, 0, newSiblings.Count);
+            
+            // 먼저 기존 형제들의 순서를 뒤로 밀어 공간 확보
+            foreach (var sibling in newSiblings.Skip(newSortOrder))
+            {
+                sibling.SortOrder += tasksToMove.Count;
+            }
+
+            // 선택된 항목들을 새 위치에 순서대로 삽입
+            var currentSortOrder = newSortOrder;
+            foreach (var task in tasksToMove.OrderBy(t => t.SortOrder))
+            {
+                task.ParentId = newParentId;
+                task.Status = newStatus;
+                task.SortOrder = currentSortOrder++;
+            }
+
+            await context.SaveChangesAsync();
+
+            // --- 7. Path 및 Depth 재귀적 업데이트 ---
+            foreach (var task in tasksToMove)
+            {
+                await UpdatePathDepthRecursiveAsync(context, task);
+            }
+            
+            await context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
+    private HashSet<int> GetAllAffectedIds(List<int> initialIds, List<TaskItem> allTasks)
+    {
+        var allAffected = new HashSet<int>(initialIds);
+        var queue = new Queue<int>(initialIds);
+        var taskLookup = allTasks.ToLookup(t => t.ParentId);
+
+        while (queue.Count > 0)
+        {
+            var parentId = queue.Dequeue();
+            if (taskLookup.Contains(parentId))
+            {
+                foreach (var child in taskLookup[parentId])
+                {
+                    if (allAffected.Add(child.Id))
+                    {
+                        queue.Enqueue(child.Id);
+                    }
+                }
+            }
+        }
+        return allAffected;
+    }
+
+    private static async Task UpdatePathDepthRecursiveAsync(GtdDbContext ctx, TaskItem node)
+    {
+        string Pad(int n) => n.ToString("D6");
+
         if (node.ParentId == null)
         {
-            node.Path = Pad(node.Id);          // ← 수정
+            node.Path = Pad(node.Id);
             node.Depth = 0;
         }
         else
         {
-            var parent = await ctx.Tasks.FindAsync(node.ParentId);
-            node.Path = $"{parent!.Path}/{Pad(node.Id)}";   // ← 수정
+            // 🔄 수정: FindAsync 대신 비동기 메서드 SingleOrDefaultAsync 사용
+            var parent = await ctx.Tasks.SingleOrDefaultAsync(t => t.Id == node.ParentId.Value);
+            if(parent == null) throw new InvalidOperationException($"Parent task with ID {node.ParentId} not found.");
+            node.Path = $"{parent.Path}/{Pad(node.Id)}";
             node.Depth = parent.Depth + 1;
         }
-
-        // ── 자손 재귀 ──
-        var descendants = await ctx.Tasks
-                                   .Where(t => t.ParentId == node.Id)
-                                   .ToListAsync();
-        foreach (var d in descendants)
+        
+        var children = await ctx.Tasks.Where(t => t.ParentId == node.Id).ToListAsync();
+        foreach (var child in children)
         {
-            await UpdatePathDepthAsync(ctx, d);
+            await UpdatePathDepthRecursiveAsync(ctx, child);
         }
     }
 }
