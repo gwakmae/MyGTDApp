@@ -6,7 +6,7 @@
 
 @implements IAsyncDisposable
 
-<div class="modal-backdrop" @onclick="HandleClose">
+<div class="modal-backdrop" @onclick="HandleBackdropClick" @ontouchstart:preventDefault="false">
     <div class="modal-container" @onclick:stopPropagation="true">
 
         <div class="modal-header">
@@ -438,5 +438,18 @@
         {
             Console.WriteLine($"모달 해제 중 오류: {ex.Message}");
         }
+    }
+
+    private async Task HandleBackdropClick(MouseEventArgs e)
+    {
+        // 큰 화면에서는 백드롭 클릭 시 모달을 닫지 않고 스크롤만 허용
+        var isLargeScreen = await JSRuntime.InvokeAsync<bool>("eval", 
+            "window.innerWidth >= 768 && window.innerHeight >= 600");
+        
+        if (!isLargeScreen)
+        {
+            await HandleClose();
+        }
+        // 큰 화면에서는 백드롭 클릭해도 모달이 닫히지 않음 (스크롤 가능)
     }
 }

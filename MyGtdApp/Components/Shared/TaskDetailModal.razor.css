@@ -577,3 +577,65 @@
 .remove-context:hover {
     color: #dc3545;
 }
+
+/* 폴더블/태블릿 대응 스타일 추가 */
+
+/* 큰 화면에서 모달이 열린 상태 */
+body.modal-open-large-screen {
+    /* 백그라운드 스크롤 허용하되, 모달 내부와 구분 */
+    overflow-y: auto !important;
+    position: static !important;
+}
+
+body.modal-open-large-screen .modal-backdrop {
+    /* backdrop에서 세로 스크롤만 허용 */
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+}
+
+/* 폴더블/태블릿 환경 최적화 */
+@media (min-width: 768px) and (min-height: 600px) {
+    .modal-backdrop {
+        /* 외부 스크롤 시 모달도 함께 이동하도록 */
+        position: absolute;
+        top: 0;
+        height: max(100vh, 100%);
+        /* 세로 스크롤 허용 */
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .modal-container {
+        /* 큰 화면에서는 더 넉넉한 여백 */
+        margin: 2rem auto;
+        max-height: calc(100vh - 4rem);
+        position: relative;
+    }
+
+    /* 폴더블 환경에서 버튼 영역 확실히 보이도록 */
+    .modal-footer {
+        position: sticky;
+        bottom: 0;
+        background-color: #f8f9fa;
+        border-top: 1px solid #e9ecef;
+        box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+        z-index: 10;
+    }
+}
+
+/* 특별히 폴더블 디바이스 대응 (Galaxy Fold 계열) */
+@media (min-width: 768px) and (max-width: 1024px) and (min-height: 600px) {
+    .modal-backdrop {
+        /* 폴더블에서는 외부 스크롤 명확히 허용 */
+        position: absolute;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .modal-container {
+        /* 폴더블에서 더 적절한 크기 */
+        max-width: 90%;
+        max-height: calc(100vh - 6rem);
+        margin: 3rem auto;
+    }
+}
