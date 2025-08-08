@@ -1,0 +1,30 @@
+@using MyGtdApp.Models
+
+<div class="bulk-action-bar @(SelectedTaskIds.Any() ? "visible" : "")">
+    <div class="bar-content">
+        <span class="selection-count">@(SelectedTaskIds.Count)개 선택됨</span>
+        <div class="actions">
+            <button class="btn btn-sm btn-outline-primary" @onclick="OnEditClick">
+                <i class="bi bi-pencil-square"></i> 일괄 편집
+            </button>
+            <button class="btn btn-sm btn-outline-danger" @onclick="OnDeleteClick">
+                <i class="bi bi-trash"></i> 삭제
+            </button>
+        </div>
+    </div>
+    <button class="btn-close" @onclick="OnDeselectAllClick"></button>
+</div>
+
+@code {
+    [Parameter]
+    public List<int> SelectedTaskIds { get; set; } = new();
+
+    [Parameter]
+    public EventCallback OnEditClick { get; set; }
+
+    [Parameter]
+    public EventCallback OnDeleteClick { get; set; }
+
+    [Parameter]
+    public EventCallback OnDeselectAllClick { get; set; }
+}

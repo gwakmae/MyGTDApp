@@ -23,6 +23,15 @@ namespace MyGtdApp.Services
         Task<List<TaskItem>> GetTodayTasksAsync();
         Task<List<string>> GetAllContextsAsync();
         Task<List<TaskItem>> GetTasksByContextAsync(string context);
+
+        // 🆕 추가
+        Task<List<TaskItem>> GetFocusTasksAsync();
+
+        // 🆕 추가
+        Task BulkUpdateTasksAsync(BulkUpdateModel updateModel);
+
+        Task DeleteTasksAsync(List<int> taskIds);
+        
         Task<string> ExportTasksToJsonAsync();
         Task ImportTasksFromJsonAsync(string jsonData);
         Task UpdateTaskExpandStateAsync(int taskId, bool isExpanded);

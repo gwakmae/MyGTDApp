@@ -4,8 +4,8 @@ namespace MyGtdApp.Components.Pages;
 
 public partial class Home
 {
-    private async Task HandleTaskAdded() => await RefreshTasks();
-    private async Task HandleUpdateTask() => await RefreshTasks();
+    private async Task HandleTaskAdded() => await RefreshDataBasedOnRoute();
+    private async Task HandleUpdateTask() => await RefreshDataBasedOnRoute();
 
     private async Task HandleToggleComplete(int id)
     {
@@ -19,8 +19,10 @@ public partial class Home
 
     private void ShowEditModal(int id)
     {
+        // 🔽 [FIX] Focus 뷰의 Task도 찾을 수 있도록 로직 보강
         taskToEdit = FindTaskById(allTopLevelTasks, id) ??
-                     FindTaskById(contextTasks, id);
+                     FindTaskById(contextTasks, id) ??
+                     FindTaskById(focusTasks, id); // focusTasks에서도 찾기
     }
 
     private async Task HandleSaveTask(TaskItem updated)

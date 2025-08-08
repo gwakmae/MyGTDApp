@@ -1,5 +1,6 @@
 ﻿using MyGtdApp.Models;
 using MyGtdApp.Repositories;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -110,6 +111,24 @@ public class DatabaseTaskService : ITaskService
     public async Task<List<TaskItem>> GetTodayTasksAsync() => await _repository.GetTodayTasksAsync();
     public async Task<List<string>> GetAllContextsAsync() => await _repository.GetAllContextsAsync();
     public async Task<List<TaskItem>> GetTasksByContextAsync(string context) => await _repository.GetByContextAsync(context);
+
+    // 🆕 추가
+    public async Task<List<TaskItem>> GetFocusTasksAsync() => await _repository.GetFocusTasksAsync();
+
+    // 🆕 추가
+    public async Task BulkUpdateTasksAsync(BulkUpdateModel updateModel)
+    {
+        await _repository.BulkUpdateTasksAsync(updateModel);
+        NotifyStateChanged();
+    }
+
+    // 🆕 추가: 일괄 삭제 구현
+    public async Task DeleteTasksAsync(List<int> taskIds)
+    {
+        await _repository.DeleteTasksAsync(taskIds);
+        NotifyStateChanged();
+    }
+    
     public async Task<string> ExportTasksToJsonAsync() => await _dataService.ExportTasksToJsonAsync();
 
     public async Task ImportTasksFromJsonAsync(string jsonData)

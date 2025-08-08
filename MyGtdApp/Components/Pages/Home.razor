@@ -1,4 +1,5 @@
 ﻿@page "/"
+@page "/focus"
 @page "/context/{Context}"
 @rendermode InteractiveServer
 
@@ -7,12 +8,14 @@
 @using MyGtdApp.Components.Shared
 @using Microsoft.AspNetCore.Components.Web
 @using TaskStatus = MyGtdApp.Models.TaskStatus
+@using MyGtdApp.Components.Pages
 
 @implements IAsyncDisposable
 
-<PageTitle>@(string.IsNullOrEmpty(Context) ? "GTD Board" : $"Context: @{Context}")</PageTitle>
+<PageTitle>@pageTitle</PageTitle>
 
-@if (string.IsNullOrEmpty(Context))
+@* --- 1. Board View --- *@
+@if (IsBoardView)
 {
     <div class="main-header modern-header">
         <div class="header-content">
@@ -39,6 +42,13 @@
                         <span class="stat-number">@todayTasks.Count</span>
                         <span class="stat-label">Today</span>
                     </div>
+                    <div class="stat-divider"></div>
+                    <a href="focus" class="stat-item-link">
+                        <div class="stat-item">
+                            <span class="stat-number">@focusTasks.Count</span>
+                            <span class="stat-label">Focus</span>
+                        </div>
+                    </a>
                 </div>
             </div>
 
@@ -61,7 +71,6 @@
             <div class="task-list">
                 @foreach (var task in FilterCompleted(todayTasks))
                 {
-                    @* 🔄 수정: 다중 선택 관련 파라미터 전달 *@
                     <ProjectTaskNode @key="task.Id"
                                      Task="task"
                                      IsSelected="selectedTaskIds.Contains(task.Id)"
@@ -89,7 +98,6 @@
                  @ondragover="() => dragOverStatus = status"
                  @ondragleave="() => dragOverStatus = null">
 
-                @* 🔄 헤더 부분 수정 - Completed 컬럼일 때만 삭제 버튼 추가 *@
                 @if (status == TaskStatus.Completed)
                 {
                     <div class="column-header-with-action">
@@ -109,7 +117,6 @@
                 <div class="task-list">
                     @foreach (var task in FilterCompleted(GetTasksForStatus(status)))
                     {
-                        @* 🔄 수정: 다중 선택 관련 파라미터 전달 *@
                         <ProjectTaskNode @key="task.Id"
                                          Task="task"
                                          IsSelected="selectedTaskIds.Contains(task.Id)"
@@ -147,10 +154,11 @@
         }
     </div>
 }
+@* --- 2. Focus 또는 Context View --- *@
 else
 {
     <div class="main-header">
-        <h1>Context: @Context</h1>
+        <h1>@pageTitle</h1>
         <button class="btn btn-outline-secondary ms-auto ms-xl-3"
                 title="Hide / Show completed tasks"
                 @onclick="ToggleHideCompleted">
@@ -159,32 +167,61 @@ else
         </button>
     </div>
 
-    <div class="context-view-container">
-        @foreach (var task in FilterCompleted(contextTasks))
+    <div class="list-view-container">
+        @{
+            var tasksToShow = IsFocusView ? focusTasks : contextTasks;
+        }
+        
+        @if (tasksToShow.Any())
         {
-            @* 🔄 수정: 다중 선택 관련 파라미터 전달 *@
-            <ProjectTaskNode @key="task.Id"
-                             Task="task"
-                             IsSelected="selectedTaskIds.Contains(task.Id)"
-                             SelectedTaskIds="selectedTaskIds"
-                             OnClick="(args) => HandleTaskClick(args.taskId, args.e)"
-                             HideCompleted="hideCompleted"
-                             OnTaskAdded="HandleTaskAdded"
-                             OnTaskDeleted="HandleDeleteTask"
-                             OnTaskUpdated="HandleUpdateTask"
-                             OnTaskDragStart="HandleDragStart"
-                             OnTaskDragEnd="HandleDragEnd"
-                             OnTaskDropped="args => HandleDropOnProject(args.targetTaskId, args.position)"
-                             OnTaskCompletedToggle="HandleToggleComplete"
-                             OnTaskDoubleClick="ShowEditModal"
-                             DraggedTaskId="draggedTaskId" />
+            @foreach (var task in FilterCompleted(tasksToShow))
+            {
+                <ProjectTaskNode @key="task.Id"
+                                 Task="task"
+                                 IsSelected="selectedTaskIds.Contains(task.Id)"
+                                 SelectedTaskIds="selectedTaskIds"
+                                 OnClick="(args) => HandleTaskClick(args.taskId, args.e)"
+                                 HideCompleted="hideCompleted"
+                                 OnTaskAdded="HandleTaskAdded"
+                                 OnTaskDeleted="HandleDeleteTask"
+                                 OnTaskUpdated="HandleUpdateTask"
+                                 OnTaskDragStart="HandleDragStart"
+                                 OnTaskDragEnd="HandleDragEnd"
+                                 OnTaskDropped="args => HandleDropOnProject(args.targetTaskId, args.position)"
+                                 OnTaskCompletedToggle="HandleToggleComplete"
+                                 OnTaskDoubleClick="ShowEditModal"
+                                 DraggedTaskId="draggedTaskId" />
+            }
+        }
+        else
+        {
+            <div class="empty-view-message">
+                <i class="bi bi-inbox"></i>
+                <span>
+                    @(IsFocusView ? "집중할 작업이 없습니다. 멋진 하루 보내세요! ✨" : "이 컨텍스트에 해당하는 작업이 없습니다.")
+                </span>
+            </div>
         }
     </div>
 }
 
+
+@* --- 항상 렌더링되는 모달 및 패널 --- *@
 @if (taskToEdit != null)
 {
     <TaskDetailModal TaskToEdit="taskToEdit"
                      OnSave="HandleSaveTask"
                      OnClose="CloseEditModal" />
 }
+
+@if(isBulkEditPanelVisible)
+{
+    <BulkEditPanel SelectedTaskIds="selectedTaskIds"
+                   OnApply="HandleBulkUpdate"
+                   OnClose="CloseBulkEditPanel" />
+}
+
+<BulkActionBar SelectedTaskIds="selectedTaskIds"
+               OnEditClick="OpenBulkEditPanel"
+               OnDeleteClick="HandleDeleteSelected"
+               OnDeselectAllClick="DeselectAll" />

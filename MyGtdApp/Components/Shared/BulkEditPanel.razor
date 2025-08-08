@@ -1,0 +1,76 @@
+@using MyGtdApp.Models
+
+@if (SelectedTaskIds.Count > 1)
+{
+    <div class="bulk-edit-panel">
+        <div class="panel-header">
+            @* 🔽 [FIX] '@SelectedTaskIds.Count개' -> '@(SelectedTaskIds.Count)개'로 수정 *@
+            <h5 class="mb-0">@(SelectedTaskIds.Count)개 항목 일괄 편집</h5>
+            <button type="button" class="btn-close" @onclick="ClosePanel"></button>
+        </div>
+        <div class="panel-body">
+            <div class="edit-group">
+                <label>마감일 변경</label>
+                <input type="date" class="form-control form-control-sm" 
+                       @bind="_bulkUpdateModel.DueDate" />
+            </div>
+
+            <div class="edit-group">
+                <label>중요도 변경</label>
+                <select class="form-select form-select-sm" @bind="_bulkUpdateModel.Priority">
+                    <option value="">-- 선택 안 함 --</option>
+                    @foreach(var p in Enum.GetValues<Priority>())
+                    {
+                        <option value="@p">@p</option>
+                    }
+                </select>
+            </div>
+
+            <div class="edit-group">
+                <label>컨텍스트 추가</label>
+                @* 🔽 [FIX] '@FollowUp' -> '@@FollowUp' (이중 @ 기호로 이스케이프) *@
+                <input type="text" class="form-control form-control-sm" 
+                       placeholder="예: @@FollowUp"
+                       @bind="_bulkUpdateModel.ContextToAdd" />
+            </div>
+
+            <div class="edit-group">
+                <label>컨텍스트 제거</label>
+                @* 🔽 [FIX] '@Waiting' -> '@@Waiting' (이중 @ 기호로 이스케이프) *@
+                <input type="text" class="form-control form-control-sm"
+                       placeholder="예: @@Waiting"
+                       @bind="_bulkUpdateModel.ContextToRemove" />
+            </div>
+        </div>
+        <div class="panel-footer">
+            <button class="btn btn-primary btn-sm" @onclick="ApplyChanges">일괄 적용</button>
+            <button class="btn btn-secondary btn-sm" @onclick="ClosePanel">취소</button>
+        </div>
+    </div>
+}
+
+
+@code {
+    [Parameter]
+    public List<int> SelectedTaskIds { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<BulkUpdateModel> OnApply { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private BulkUpdateModel _bulkUpdateModel = new();
+
+    protected override void OnParametersSet()
+    {
+        if (SelectedTaskIds.Any())
+        {
+            _bulkUpdateModel = new BulkUpdateModel { TaskIds = new List<int>(SelectedTaskIds) };
+        }
+    }
+
+    private Task ApplyChanges() => OnApply.InvokeAsync(_bulkUpdateModel);
+
+    private Task ClosePanel() => OnClose.InvokeAsync();
+}

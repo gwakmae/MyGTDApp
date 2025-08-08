@@ -1,6 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using MyGtdApp.Models;
 using MyGtdApp.Services;
+using System.Collections.Generic;
+using System.Linq;
 using TaskStatus = MyGtdApp.Models.TaskStatus; // 모호성 해결
 
 namespace MyGtdApp.Repositories;
@@ -19,9 +21,9 @@ public class TaskRepository : ITaskRepository
         using var context = _dbContextFactory.CreateDbContext();
 
         var allTasks = await context.Tasks
-                                     .AsNoTracking()
-                                     .OrderBy(t => t.SortOrder)
-                                     .ToListAsync();
+                                   .AsNoTracking()
+                                   .OrderBy(t => t.SortOrder)
+                                   .ToListAsync();
 
         var lookup = allTasks.ToDictionary(t => t.Id);
 
@@ -141,8 +143,8 @@ public class TaskRepository : ITaskRepository
     {
         using var ctx = _dbContextFactory.CreateDbContext();
         var roots = await ctx.Tasks
-                              .Where(t => t.Status == status)
-                              .ToListAsync();
+                             .Where(t => t.Status == status)
+                             .ToListAsync();
 
         foreach (var r in roots)
         {
@@ -181,17 +183,105 @@ public class TaskRepository : ITaskRepository
          .ThenByDescending(t => t.Priority)
          .ToListAsync();
     }
+    
+    // 🆕 추가: Focus View에 표시될 Task를 가져옵니다.
+    public async Task<List<TaskItem>> GetFocusTasksAsync()
+    {
+        using var context = _dbContextFactory.CreateDbContext();
+        var today = System.DateTime.Today;
 
+        return await context.Tasks
+            .Where(t => !t.IsCompleted &&
+                        (t.Priority == Priority.High || (t.DueDate.HasValue && t.DueDate.Value.Date <= today.AddDays(3))))
+            .OrderBy(t => t.DueDate ?? System.DateTime.MaxValue)
+            .ThenByDescending(t => t.Priority)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    // 🆕 추가: 여러 Task를 일괄적으로 업데이트합니다.
+    public async Task BulkUpdateTasksAsync(BulkUpdateModel model)
+    {
+        if (model.TaskIds == null || !model.TaskIds.Any())
+            return;
+
+        using var context = _dbContextFactory.CreateDbContext();
+        var tasksToUpdate = await context.Tasks
+            .Where(t => model.TaskIds.Contains(t.Id))
+            .ToListAsync();
+
+        foreach (var task in tasksToUpdate)
+        {
+            if (model.DueDate.HasValue)
+            {
+                task.DueDate = model.DueDate;
+            }
+
+            if (model.Priority.HasValue)
+            {
+                task.Priority = model.Priority.Value;
+            }
+
+            if (!string.IsNullOrWhiteSpace(model.ContextToAdd))
+            {
+                var contextToAdd = model.ContextToAdd.StartsWith("@") ? model.ContextToAdd : $"@{model.ContextToAdd}";
+                if (!task.Contexts.Contains(contextToAdd))
+                {
+                    task.Contexts.Add(contextToAdd);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(model.ContextToRemove))
+            {
+                var contextToRemove = model.ContextToRemove.StartsWith("@") ? model.ContextToRemove : $"@{model.ContextToRemove}";
+                task.Contexts.Remove(contextToRemove);
+            }
+        }
+        
+        await context.SaveChangesAsync();
+    }
+
+    // 🆕 추가: 일괄 삭제 구현
+    public async Task DeleteTasksAsync(List<int> taskIds)
+    {
+        if (taskIds == null || !taskIds.Any()) return;
+
+        using var context = _dbContextFactory.CreateDbContext();
+        var allIdsToDelete = new HashSet<int>();
+        var allTasks = await context.Tasks.AsNoTracking().ToListAsync();
+
+        foreach (var id in taskIds)
+        {
+            var task = allTasks.FirstOrDefault(t => t.Id == id);
+            if (task != null)
+            {
+                var descendants = allTasks.Where(t => t.Path.StartsWith(task.Path + "/")).Select(t => t.Id);
+                allIdsToDelete.Add(id);
+                foreach (var descId in descendants)
+                {
+                    allIdsToDelete.Add(descId);
+                }
+            }
+        }
+
+        var tasksToDelete = await context.Tasks.Where(t => allIdsToDelete.Contains(t.Id)).ToListAsync();
+        if (tasksToDelete.Any())
+        {
+            context.Tasks.RemoveRange(tasksToDelete);
+            await context.SaveChangesAsync();
+        }
+    }
+    
     public async Task<List<string>> GetAllContextsAsync()
     {
         using var context = _dbContextFactory.CreateDbContext();
         var allTasks = await context.Tasks.ToListAsync();
 
         var allContexts = allTasks
-                                   .SelectMany(t => t.Contexts)
-                                   .Distinct()
-                                   .OrderBy(c => c)
-                                   .ToList();
+                                       .SelectMany(t => t.Contexts)
+                                       .Distinct()
+                                       .OrderBy(c => c)
+                                       .ToList();
 
         return allContexts;
     }

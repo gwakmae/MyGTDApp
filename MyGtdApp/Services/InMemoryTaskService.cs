@@ -267,5 +267,86 @@ namespace MyGtdApp.Services
             NotifyStateChanged();
             return Task.CompletedTask;
         }
+
+        // 🔽 [FIX] 누락된 인터페이스 메서드 구현
+        public Task<List<TaskItem>> GetFocusTasksAsync()
+        {
+            var today = DateTime.Today;
+            var focusTasks = _tasks
+                .Where(t => !t.IsCompleted &&
+                            (t.Priority == Priority.High || (t.DueDate.HasValue && t.DueDate.Value.Date <= today.AddDays(3))))
+                .OrderBy(t => t.DueDate ?? DateTime.MaxValue)
+                .ThenByDescending(t => t.Priority)
+                .ToList();
+            return Task.FromResult(focusTasks);
+        }
+
+        // 🔽 [FIX] 누락된 인터페이스 메서드 구현
+        public Task BulkUpdateTasksAsync(BulkUpdateModel model)
+        {
+            if (model.TaskIds == null || !model.TaskIds.Any())
+                return Task.CompletedTask;
+
+            var tasksToUpdate = _tasks.Where(t => model.TaskIds.Contains(t.Id)).ToList();
+
+            foreach (var task in tasksToUpdate)
+            {
+                if (model.DueDate.HasValue)
+                {
+                    task.DueDate = model.DueDate;
+                }
+                if (model.Priority.HasValue)
+                {
+                    task.Priority = model.Priority.Value;
+                }
+                if (!string.IsNullOrWhiteSpace(model.ContextToAdd))
+                {
+                    var contextToAdd = model.ContextToAdd.StartsWith("@") ? model.ContextToAdd : $"@{model.ContextToAdd}";
+                    if (!task.Contexts.Contains(contextToAdd))
+                    {
+                        task.Contexts.Add(contextToAdd);
+                    }
+                }
+                if (!string.IsNullOrWhiteSpace(model.ContextToRemove))
+                {
+                    var contextToRemove = model.ContextToRemove.StartsWith("@") ? model.ContextToRemove : $"@{model.ContextToRemove}";
+                    task.Contexts.Remove(contextToRemove);
+                }
+            }
+
+            NotifyStateChanged();
+            return Task.CompletedTask;
+        }
+
+        // 🔽 [FIX] 누락되었던 일괄 삭제 메서드를 여기에 구현합니다.
+        public Task DeleteTasksAsync(List<int> taskIds)
+        {
+            if (taskIds == null || !taskIds.Any())
+            {
+                return Task.CompletedTask;
+            }
+
+            var allIdsToDelete = new HashSet<int>(taskIds);
+            var queue = new Queue<int>(taskIds);
+
+            // 자식 항목들도 모두 삭제 목록에 추가
+            while (queue.Count > 0)
+            {
+                var parentId = queue.Dequeue();
+                var children = _tasks.Where(t => t.ParentId == parentId).ToList();
+                foreach (var child in children)
+                {
+                    if (allIdsToDelete.Add(child.Id))
+                    {
+                        queue.Enqueue(child.Id);
+                    }
+                }
+            }
+            
+            _tasks.RemoveAll(t => allIdsToDelete.Contains(t.Id));
+
+            NotifyStateChanged();
+            return Task.CompletedTask;
+        }
     }
 }

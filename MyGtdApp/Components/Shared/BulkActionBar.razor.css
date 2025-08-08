@@ -1,0 +1,51 @@
+.bulk-action-bar {
+    position: fixed;
+    bottom: -100px; /* 기본적으로 숨김 */
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    min-width: 300px;
+    background-color: #2c3e50;
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    z-index: 1090;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    transition: bottom 0.3s ease-in-out;
+}
+
+.bulk-action-bar.visible {
+    bottom: 20px; /* 선택 시 나타남 */
+}
+
+.bar-content {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.selection-count {
+    font-weight: 500;
+    padding-right: 1.5rem;
+    border-right: 1px solid #465a70;
+}
+
+.actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.bulk-action-bar .btn-close {
+    background: none;
+    border: none;
+    color: white;
+    opacity: 0.7;
+    filter: invert(1) grayscale(100%) brightness(200%); /* Bootstrap 아이콘 색상 변경 */
+}
+
+.bulk-action-bar .btn-close:hover {
+    opacity: 1;
+}
