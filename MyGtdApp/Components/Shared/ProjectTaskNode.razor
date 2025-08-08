@@ -127,12 +127,28 @@
 
     private async Task ToggleQuickAdd()
     {
+        // 💡 개선: 자식 항목 추가 시 부모가 접혀 있으면 자동으로 펼쳐서 UX 개선
+        if (!isAddingChild && !Task.IsExpanded)
+        {
+            Task.IsExpanded = true;
+            await TaskService.UpdateTaskExpandStateAsync(Task.Id, Task.IsExpanded);
+        }
+
         isAddingChild = !isAddingChild;
         if (isAddingChild)
         {
             await System.Threading.Tasks.Task.Delay(50);
-            try { if (quickAddInputRefForChild.Context != null) await quickAddInputRefForChild.FocusAsync(); }
-            catch (InvalidOperationException) { }
+            try 
+            { 
+                if (quickAddInputRefForChild.Context != null) 
+                {
+                    await quickAddInputRefForChild.FocusAsync(); 
+                }
+            }
+            catch (InvalidOperationException) 
+            { 
+                // 렌더링 과정에서 포커스 설정이 실패하는 예외는 무시합니다.
+            }
         }
     }
 
