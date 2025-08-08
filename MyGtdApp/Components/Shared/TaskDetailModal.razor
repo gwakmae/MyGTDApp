@@ -17,128 +17,15 @@
         <div class="modal-body">
             @if (_localTask != null)
             {
-                <form @onsubmit="HandleFormSubmit" @onsubmit:preventDefault="true">
-                    <div class="form-group">
-                        <label for="title">Title</label>
-                        <input id="title"
-                               class="form-control"
-                               @bind="_localTask.Title"
-                               @onkeyup="HandleTitleKeyUp" />
-                    </div>
+                <form @onsubmit="HandleSave" @onsubmit:preventDefault="true">
+                    
+                    <TaskDetail_Title @bind-Value="_localTask.Title" OnEnter="HandleSave" />
 
-                    <div class="form-group">
-                        <div class="description-header">
-                            <label for="description">Description</label>
-                            <div class="description-tools">
-                                <button type="button" class="btn-tool" @onclick="ClearDescription" title="Clear">
-                                    <i class="bi bi-x-circle"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <textarea id="description"
-                                  class="form-control description-textarea"
-                                  rows="4"
-                                  placeholder="Enter detailed description, notes, or checklist..."
-                                  maxlength="2000"
-                                  @bind="_localTask.Description"
-                                  @oninput="OnDescriptionInput"
-                                  @onkeydown="HandleDescriptionKeyDown"></textarea>
-                        <div class="description-footer">
-                            <small class="description-hint">
-                                <i class="bi bi-info-circle"></i>
-                                Supports multiple lines. Use Ctrl+Enter to save.
-                            </small>
-                            <div class="description-counter @GetCounterClass()">
-                                @(_localTask?.Description?.Length ?? 0) / 2000
-                            </div>
-                        </div>
-                    </div>
+                    <TaskDetail_Description @bind-Value="_localTask.Description" OnCtrlEnter="HandleSave" />
 
-                    <div class="date-group">
-                        <div class="form-group">
-                            <label for="start-date">Start Date</label>
-                            <input id="start-date" type="date" class="form-control"
-                                   value="@((_localTask != null && _localTask.StartDate.HasValue) ? _localTask.StartDate.Value.ToString("yyyy-MM-dd") : "")"
-                                   @onchange="HandleStartDateChange" />
-                        </div>
-                        <div class="form-group">
-                            <label for="due-date">Due Date</label>
-                            <input id="due-date" type="date" class="form-control"
-                                   value="@((_localTask != null && _localTask.DueDate.HasValue) ? _localTask.DueDate.Value.ToString("yyyy-MM-dd") : "")"
-                                   @onchange="HandleDueDateChange" />
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <div class="contexts-header">
-                            <label>Contexts</label>
-                            <small class="context-help-text">Click to select, right-click or long-press to delete from system</small>
-                        </div>
-
-                        @if (availableContexts.Any())
-                        {
-                            <div class="context-tags">
-                                @foreach (var context in availableContexts)
-                                {
-                                    <div class="context-tag-wrapper">
-                                        <button type="button"
-                                                class="context-tag @(IsContextSelected(context) ? "selected" : "")"
-                                                @onclick="() => ToggleContext(context)">
-                                            @context
-                                            @if (IsContextSelected(context))
-                                            {
-                                                <i class="bi bi-check-circle-fill"></i>
-                                            }
-                                            else
-                                            {
-                                                <i class="bi bi-circle"></i>
-                                            }
-                                        </button>
-                                        <button type="button"
-                                                class="context-delete-btn"
-                                                @onclick="() => DeleteContext(context)"
-                                                title="Delete '@context' from all tasks">
-                                            <i class="bi bi-x-circle-fill"></i>
-                                        </button>
-                                    </div>
-                                }
-                            </div>
-                        }
-
-                        <div class="new-context-input">
-                            <div class="input-group">
-                                <input type="text"
-                                       class="form-control"
-                                       placeholder="Add new context (e.g., @@Work)"
-                                       @bind="newContextInput"
-                                       @onkeydown="HandleNewContextKeyDown"
-                                       @onkeyup="HandleNewContextKeyUp" />
-                                <button type="button"
-                                        class="btn btn-add-context"
-                                        @onclick="AddNewContext"
-                                        disabled="@string.IsNullOrWhiteSpace(newContextInput)">
-                                    <i class="bi bi-plus-circle-fill"></i>
-                                    <span class="btn-add-text">Add</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        @if (_localTask?.Contexts?.Any() == true)
-                        {
-                            <div class="selected-contexts">
-                                <small class="text-muted">Selected:</small>
-                                @foreach (var context in _localTask.Contexts)
-                                {
-                                    <span class="selected-context-badge">
-                                        @context
-                                        <button type="button" class="remove-context" @onclick="() => RemoveContext(context)">
-                                            <i class="bi bi-x"></i>
-                                        </button>
-                                    </span>
-                                }
-                            </div>
-                        }
-                    </div>
+                    <TaskDetail_Dates @bind-StartDate="_localTask.StartDate" @bind-DueDate="_localTask.DueDate" />
+                    
+                    <TaskDetail_Contexts @bind-SelectedContexts="_localTask.Contexts" />
 
                     <button type="submit" style="display: none;"></button>
                 </form>
@@ -167,8 +54,6 @@
     public EventCallback OnClose { get; set; }
 
     private TaskItem? _localTask;
-    private List<string> availableContexts = new();
-    private string newContextInput = "";
 
     protected override void OnParametersSet()
     {
@@ -186,200 +71,14 @@
             DueDate = TaskToEdit.DueDate,
             Contexts = new List<string>(TaskToEdit.Contexts ?? new List<string>())
         };
-
-        InvokeAsync(LoadAvailableContexts);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            // 모달 열릴 때 백그라운드 스크롤 차단
             await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", true);
-
-            // 🆕 추가: 컨텍스트 입력 핸들링 설정
-            try
-            {
-                await JSRuntime.InvokeVoidAsync("setupContextInputHandling");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"컨텍스트 입력 핸들링 설정 실패: {ex.Message}");
-            }
         }
-    }
-
-    private async Task LoadAvailableContexts()
-    {
-        try
-        {
-            availableContexts = await TaskService.GetAllContextsAsync();
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"컨텍스트 로드 실패: {ex.Message}");
-            availableContexts = new List<string>();
-        }
-    }
-
-    // 🆕 컨텍스트 삭제 관련 메서드들
-    private async Task DeleteContext(string context)
-    {
-        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
-                $"정말로 '{context}' 컨텍스트를 시스템에서 완전히 삭제하시겠습니까?\n" +
-                "이 컨텍스트를 사용하는 모든 작업에서 제거됩니다.");
-
-        if (!confirmed) return;
-
-        try
-        {
-            // 서비스에 컨텍스트 삭제 요청
-            await TaskService.DeleteContextAsync(context);
-
-            // UI에서도 제거
-            availableContexts.Remove(context);
-            _localTask?.Contexts?.Remove(context);
-
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            await JSRuntime.InvokeVoidAsync("alert", $"컨텍스트 삭제 중 오류가 발생했습니다: {ex.Message}");
-        }
-    }
-
-    // 기존 컨텍스트 관련 메서드들
-    private bool IsContextSelected(string context)
-    {
-        return _localTask?.Contexts?.Contains(context) == true;
-    }
-
-    private void ToggleContext(string context)
-    {
-        if (_localTask?.Contexts == null) return;
-
-        if (_localTask.Contexts.Contains(context))
-        {
-            _localTask.Contexts.Remove(context);
-        }
-        else
-        {
-            _localTask.Contexts.Add(context);
-        }
-        StateHasChanged();
-    }
-
-    private void RemoveContext(string context)
-    {
-        _localTask?.Contexts?.Remove(context);
-        StateHasChanged();
-    }
-
-    // 🆕 추가: 키다운 이벤트 핸들러 (엔터키 기본 동작 방지)
-    private void HandleNewContextKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter")
-        {
-            // 엔터키의 기본 동작(폼 제출) 방지
-            // Blazor에서는 preventDefault를 직접 호출할 수 없으므로
-            // 대신 키업 이벤트에서 처리하고 여기서는 로깅만
-            Console.WriteLine("[CONTEXT] 엔터키 감지 - 키업에서 처리 예정");
-        }
-    }
-
-    // 🔧 수정: 키업 이벤트 핸들러 개선
-    private async Task HandleNewContextKeyUp(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(newContextInput))
-        {
-            Console.WriteLine("[CONTEXT] 엔터키로 새 컨텍스트 추가 실행");
-            
-            // 엔터키로 컨텍스트 추가
-            AddNewContext();
-            
-            // 추가 후 입력 필드에 다시 포커스 (모바일에서 키보드 유지)
-            await Task.Delay(100); // 짧은 지연으로 DOM 업데이트 대기
-            StateHasChanged();
-        }
-        else if (e.Key == "Escape")
-        {
-            // ESC 키로 입력 취소
-            newContextInput = "";
-            StateHasChanged();
-        }
-    }
-    
-    // 🔧 수정: 새 컨텍스트는 선택 목록에만 추가, 즉시 저장하지 않음
-    private void AddNewContext()
-    {
-        if (string.IsNullOrWhiteSpace(newContextInput))
-            return;
-
-        var context = newContextInput.Trim();
-        if (!context.StartsWith("@"))
-        {
-            context = "@" + context;
-        }
-
-        // 🔧 핵심: availableContexts에만 추가, Task에는 자동 적용하지 않음
-        if (!availableContexts.Contains(context))
-        {
-            availableContexts.Add(context);
-            availableContexts.Sort();
-            Console.WriteLine($"새 컨텍스트 '{context}' 선택 목록에 추가됨");
-        }
-
-        newContextInput = "";
-        StateHasChanged();
-
-        // ❌ 제거: 자동 적용 및 즉시 저장 코드 모두 제거
-    }
-
-    // 기존 메서드들... (HandleTitleKeyUp, HandleDescriptionKeyDown 등 그대로 유지)
-    private async Task HandleTitleKeyUp(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter")
-        {
-            await HandleSave();
-        }
-    }
-
-    private async Task HandleDescriptionKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && e.CtrlKey)
-        {
-            await HandleSave();
-        }
-        else if (e.Key == "Escape")
-        {
-            await HandleClose();
-        }
-    }
-
-    private void HandleStartDateChange(ChangeEventArgs e)
-    {
-        if (_localTask != null)
-        {
-            _localTask.StartDate = !string.IsNullOrEmpty(e.Value?.ToString())
-                ? DateTime.Parse(e.Value.ToString()!)
-                : null;
-        }
-    }
-
-    private void HandleDueDateChange(ChangeEventArgs e)
-    {
-        if (_localTask != null)
-        {
-            _localTask.DueDate = !string.IsNullOrEmpty(e.Value?.ToString())
-                ? DateTime.Parse(e.Value.ToString()!)
-                : null;
-        }
-    }
-
-    private async Task HandleFormSubmit()
-    {
-        await HandleSave();
     }
 
     private async Task HandleSave()
@@ -396,60 +95,26 @@
         await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", false);
         await OnClose.InvokeAsync();
     }
-
-    private void OnDescriptionInput(ChangeEventArgs e)
+    
+    private async Task HandleBackdropClick()
     {
-        if (_localTask != null)
+        var isLargeScreen = await JSRuntime.InvokeAsync<bool>("eval", "window.innerWidth >= 768 && window.innerHeight >= 600");
+        if (!isLargeScreen)
         {
-            _localTask.Description = e.Value?.ToString() ?? "";
-            StateHasChanged();
+            await HandleClose();
         }
     }
 
-    private void ClearDescription()
-    {
-        if (_localTask != null)
-        {
-            _localTask.Description = "";
-            StateHasChanged();
-        }
-    }
-
-    private string GetCounterClass()
-    {
-        var length = _localTask?.Description?.Length ?? 0;
-        if (length > 1800) return "danger";
-        if (length > 1500) return "warning";
-        return "";
-    }
-
-    // IAsyncDisposable 구현
     public async ValueTask DisposeAsync()
     {
         try
         {
             await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", false);
         }
-        catch (JSDisconnectedException)
-        {
-            // 연결 해제 시 무시
-        }
+        catch (JSDisconnectedException) { }
         catch (Exception ex)
         {
             Console.WriteLine($"모달 해제 중 오류: {ex.Message}");
         }
-    }
-
-    private async Task HandleBackdropClick(MouseEventArgs e)
-    {
-        // 큰 화면에서는 백드롭 클릭 시 모달을 닫지 않고 스크롤만 허용
-        var isLargeScreen = await JSRuntime.InvokeAsync<bool>("eval", 
-            "window.innerWidth >= 768 && window.innerHeight >= 600");
-        
-        if (!isLargeScreen)
-        {
-            await HandleClose();
-        }
-        // 큰 화면에서는 백드롭 클릭해도 모달이 닫히지 않음 (스크롤 가능)
     }
 }

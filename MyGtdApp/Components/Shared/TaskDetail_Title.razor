@@ -1,0 +1,42 @@
+@using Microsoft.AspNetCore.Components.Web
+
+<div class="form-group">
+    <label for="title">Title</label>
+    <input id="title"
+           class="form-control"
+           @bind="CurrentValue"
+           @bind:event="oninput"
+           @onkeyup="HandleKeyUp" />
+</div>
+
+@code {
+    private string? CurrentValue
+    {
+        get => Value;
+        set
+        {
+            if (Value != value)
+            {
+                Value = value;
+                ValueChanged.InvokeAsync(value);
+            }
+        }
+    }
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnEnter { get; set; }
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await OnEnter.InvokeAsync();
+        }
+    }
+}

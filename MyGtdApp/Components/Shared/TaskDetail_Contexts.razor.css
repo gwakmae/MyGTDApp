@@ -1,0 +1,304 @@
+/* 컨텍스트 태그 스타일 */
+.context-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+/* 컨텍스트 헤더 개선 */
+.contexts-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+}
+
+.context-help-text {
+    color: #6c757d;
+    font-size: 0.75rem;
+    font-style: italic;
+}
+
+/* 컨텍스트 태그 래퍼 */
+.context-tag-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.context-tag {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.4rem 0.75rem;
+    border: 1px solid #ced4da;
+    border-radius: 16px;
+    background-color: #fff;
+    color: #495057;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    padding-right: 2rem;
+}
+
+.context-tag:hover {
+    border-color: #80bdff;
+    background-color: #f0f8ff;
+}
+
+.context-tag.selected {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.context-tag i {
+    font-size: 0.75rem;
+}
+
+/* 컨텍스트 삭제 버튼 */
+.context-delete-btn {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 18px;
+    height: 18px;
+    border: none;
+    background: #dc3545;
+    color: white;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.2s ease;
+    z-index: 1;
+}
+
+.context-tag-wrapper:hover .context-delete-btn {
+    opacity: 1;
+}
+
+.context-tag.selected + .context-delete-btn {
+    display: none;
+}
+
+/* 새 컨텍스트 입력 개선 */
+.new-context-input {
+    margin-bottom: 1rem;
+}
+
+.input-group {
+    display: flex;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.input-group .form-control {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right: none;
+    flex: 1;
+    border: 2px solid #e9ecef;
+    transition: border-color 0.2s ease;
+}
+
+.input-group .form-control:focus {
+    border-color: #007bff;
+    box-shadow: none;
+}
+
+.btn-add-context {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding: 0.75rem 1.25rem;
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    border: 2px solid #007bff;
+    color: white;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-width: 80px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-add-context:disabled {
+    background: #e9ecef;
+    border-color: #e9ecef;
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
+/* 선택된 컨텍스트 */
+.selected-contexts {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.selected-context-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background-color: #e7f3ff;
+    color: #0056b3;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin-right: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.remove-context {
+    background: none;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 0.25rem;
+}
+
+.remove-context:hover {
+    color: #dc3545;
+}```
+
+---
+
+### 파일 8/9: `Components/Shared/TaskDetailModal.razor` (리팩토링 후)
+
+모든 복잡한 UI와 로직을 자식 컴포넌트에 위임한 후의 부모 컴포넌트입니다. 코드가 훨씬 간결해지고 전체적인 구조를 파악하기 쉬워졌습니다. 자식 컴포넌트들을 조립하고 데이터 바인딩, 최종 저장/닫기 이벤트 처리의 역할만 수행합니다.
+
+```csharp
+@using MyGtdApp.Models
+@using MyGtdApp.Services
+@using System.Globalization
+@inject ITaskService TaskService
+@inject IJSRuntime JSRuntime
+
+@implements IAsyncDisposable
+
+<div class="modal-backdrop" @onclick="HandleBackdropClick" @ontouchstart:preventDefault="false">
+    <div class="modal-container" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <h3>Edit Task Details</h3>
+            <button class="close-btn" @onclick="HandleClose">×</button>
+        </div>
+
+        <div class="modal-body">
+            @if (_localTask != null)
+            {
+                <form @onsubmit="HandleSave" @onsubmit:preventDefault="true">
+                    
+                    <TaskDetail_Title @bind-Value="_localTask.Title" OnEnter="HandleSave" />
+
+                    <TaskDetail_Description @bind-Value="_localTask.Description" OnCtrlEnter="HandleSave" />
+
+                    <TaskDetail_Dates @bind-StartDate="_localTask.StartDate" @bind-DueDate="_localTask.DueDate" />
+                    
+                    <TaskDetail_Contexts @bind-SelectedContexts="_localTask.Contexts" />
+
+                    <button type="submit" style="display: none;"></button>
+                </form>
+            }
+            else
+            {
+                <p>Loading...</p>
+            }
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn btn-secondary" @onclick="HandleClose">Cancel</button>
+            <button class="btn btn-primary" @onclick="HandleSave">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskItem TaskToEdit { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<TaskItem> OnSave { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private TaskItem? _localTask;
+
+    protected override void OnParametersSet()
+    {
+        _localTask = new TaskItem
+        {
+            Id = TaskToEdit.Id,
+            Title = TaskToEdit.Title,
+            Description = TaskToEdit.Description ?? string.Empty,
+            Priority = TaskToEdit.Priority,
+            Status = TaskToEdit.Status,
+            ParentId = TaskToEdit.ParentId,
+            SortOrder = TaskToEdit.SortOrder,
+            IsCompleted = TaskToEdit.IsCompleted,
+            StartDate = TaskToEdit.StartDate,
+            DueDate = TaskToEdit.DueDate,
+            Contexts = new List<string>(TaskToEdit.Contexts ?? new List<string>())
+        };
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", true);
+        }
+    }
+
+    private async Task HandleSave()
+    {
+        if (_localTask != null)
+        {
+            await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", false);
+            await OnSave.InvokeAsync(_localTask);
+        }
+    }
+
+    private async Task HandleClose()
+    {
+        await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", false);
+        await OnClose.InvokeAsync();
+    }
+    
+    private async Task HandleBackdropClick()
+    {
+        var isLargeScreen = await JSRuntime.InvokeAsync<bool>("eval", "window.innerWidth >= 768 && window.innerHeight >= 600");
+        if (!isLargeScreen)
+        {
+            await HandleClose();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", false);
+        }
+        catch (JSDisconnectedException) { }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"모달 해제 중 오류: {ex.Message}");
+        }
+    }
+}

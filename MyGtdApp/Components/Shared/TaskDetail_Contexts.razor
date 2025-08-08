@@ -1,0 +1,192 @@
+@using MyGtdApp.Models
+@using MyGtdApp.Services
+@inject ITaskService TaskService
+@inject IJSRuntime JSRuntime
+
+<div class="form-group">
+    <div class="contexts-header">
+        <label>Contexts</label>
+        <small class="context-help-text">Click to select, right-click or long-press to delete from system</small>
+    </div>
+
+    @if (availableContexts.Any())
+    {
+        <div class="context-tags">
+            @foreach (var context in availableContexts)
+            {
+                <div class="context-tag-wrapper">
+                    <button type="button"
+                            class="context-tag @(IsContextSelected(context) ? "selected" : "")"
+                            @onclick="() => ToggleContext(context)">
+                        @context
+                        @if (IsContextSelected(context))
+                        {
+                            <i class="bi bi-check-circle-fill"></i>
+                        }
+                        else
+                        {
+                            <i class="bi bi-circle"></i>
+                        }
+                    </button>
+                    <button type="button"
+                            class="context-delete-btn"
+                            @onclick="() => DeleteContext(context)"
+                            title="Delete '@context' from all tasks">
+                        <i class="bi bi-x-circle-fill"></i>
+                    </button>
+                </div>
+            }
+        </div>
+    }
+
+    <div class="new-context-input">
+        <div class="input-group">
+            <input type="text"
+                   class="form-control"
+                   placeholder="Add new context (e.g., @@Work)"
+                   @bind="newContextInput"
+                   @onkeydown="HandleNewContextKeyDown"
+                   @onkeyup="HandleNewContextKeyUp" />
+            <button type="button"
+                    class="btn btn-add-context"
+                    @onclick="AddNewContext"
+                    disabled="@string.IsNullOrWhiteSpace(newContextInput)">
+                <i class="bi bi-plus-circle-fill"></i>
+                <span class="btn-add-text">Add</span>
+            </button>
+        </div>
+    </div>
+
+    @if (SelectedContexts?.Any() == true)
+    {
+        <div class="selected-contexts">
+            <small class="text-muted">Selected:</small>
+            @foreach (var context in SelectedContexts)
+            {
+                <span class="selected-context-badge">
+                    @context
+                    <button type="button" class="remove-context" @onclick="() => RemoveContext(context)">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </span>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public List<string>? SelectedContexts { get; set; }
+
+    [Parameter]
+    public EventCallback<List<string>?> SelectedContextsChanged { get; set; }
+
+    private List<string> availableContexts = new();
+    private string newContextInput = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAvailableContexts();
+    }
+
+    private async Task LoadAvailableContexts()
+    {
+        try
+        {
+            availableContexts = await TaskService.GetAllContextsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"컨텍스트 로드 실패: {ex.Message}");
+            availableContexts = new List<string>();
+        }
+    }
+
+    private async Task DeleteContext(string context)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+                $"정말로 '{context}' 컨텍스트를 시스템에서 완전히 삭제하시겠습니까?\n" +
+                "이 컨텍스트를 사용하는 모든 작업에서 제거됩니다.");
+
+        if (!confirmed) return;
+
+        try
+        {
+            await TaskService.DeleteContextAsync(context);
+            availableContexts.Remove(context);
+            await RemoveContext(context); // Also remove from current selection
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"컨텍스트 삭제 중 오류가 발생했습니다: {ex.Message}");
+        }
+    }
+
+    private bool IsContextSelected(string context)
+    {
+        return SelectedContexts?.Contains(context) == true;
+    }
+
+    private Task ToggleContext(string context)
+    {
+        if (SelectedContexts == null) SelectedContexts = new List<string>();
+
+        if (SelectedContexts.Contains(context))
+        {
+            SelectedContexts.Remove(context);
+        }
+        else
+        {
+            SelectedContexts.Add(context);
+        }
+        return SelectedContextsChanged.InvokeAsync(SelectedContexts);
+    }
+
+    private Task RemoveContext(string context)
+    {
+        SelectedContexts?.Remove(context);
+        return SelectedContextsChanged.InvokeAsync(SelectedContexts);
+    }
+
+    private void HandleNewContextKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            // The actual logic is in KeyUp to ensure the input value is updated.
+            // In a real scenario, you might want JS interop to prevent default form submission.
+        }
+    }
+
+    private async Task HandleNewContextKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(newContextInput))
+        {
+            AddNewContext();
+            await Task.Delay(50); // Allow UI to update
+        }
+        else if (e.Key == "Escape")
+        {
+            newContextInput = "";
+        }
+    }
+
+    private void AddNewContext()
+    {
+        if (string.IsNullOrWhiteSpace(newContextInput))
+            return;
+
+        var context = newContextInput.Trim();
+        if (!context.StartsWith("@"))
+        {
+            context = "@" + context;
+        }
+
+        if (!availableContexts.Contains(context))
+        {
+            availableContexts.Add(context);
+            availableContexts.Sort();
+        }
+
+        newContextInput = "";
+    }
+}

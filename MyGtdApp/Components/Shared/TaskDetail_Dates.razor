@@ -1,0 +1,48 @@
+<div class="date-group">
+    <div class="form-group">
+        <label for="start-date">Start Date</label>
+        <input id="start-date" type="date" class="form-control"
+               value="@(StartDate.HasValue ? StartDate.Value.ToString("yyyy-MM-dd") : "")"
+               @onchange="HandleStartDateChange" />
+    </div>
+    <div class="form-group">
+        <label for="due-date">Due Date</label>
+        <input id="due-date" type="date" class="form-control"
+               value="@(DueDate.HasValue ? DueDate.Value.ToString("yyyy-MM-dd") : "")"
+               @onchange="HandleDueDateChange" />
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public DateTime? StartDate { get; set; }
+
+    [Parameter]
+    public EventCallback<DateTime?> StartDateChanged { get; set; }
+
+    [Parameter]
+    public DateTime? DueDate { get; set; }
+
+    [Parameter]
+    public EventCallback<DateTime?> DueDateChanged { get; set; }
+
+    private void HandleStartDateChange(ChangeEventArgs e)
+    {
+        var newValue = !string.IsNullOrEmpty(e.Value?.ToString())
+            ? DateTime.Parse(e.Value.ToString()!)
+            : (DateTime?)null;
+        
+        StartDate = newValue;
+        StartDateChanged.InvokeAsync(newValue);
+    }
+
+    private void HandleDueDateChange(ChangeEventArgs e)
+    {
+        var newValue = !string.IsNullOrEmpty(e.Value?.ToString())
+            ? DateTime.Parse(e.Value.ToString()!)
+            : (DateTime?)null;
+
+        DueDate = newValue;
+        DueDateChanged.InvokeAsync(newValue);
+    }
+}

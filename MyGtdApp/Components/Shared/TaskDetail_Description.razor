@@ -1,0 +1,79 @@
+@using Microsoft.AspNetCore.Components.Web
+
+<div class="form-group">
+    <div class="description-header">
+        <label for="description">Description</label>
+        <div class="description-tools">
+            <button type="button" class="btn-tool" @onclick="ClearDescription" title="Clear">
+                <i class="bi bi-x-circle"></i>
+            </button>
+        </div>
+    </div>
+    <textarea id="description"
+              class="form-control description-textarea"
+              rows="4"
+              placeholder="Enter detailed description, notes, or checklist..."
+              maxlength="2000"
+              @bind="CurrentValue"
+              @bind:event="oninput"
+              @onkeydown="HandleKeyDown"
+              @onkeydown:preventDefault="KeyDownPreventDefault"></textarea>
+    <div class="description-footer">
+        <small class="description-hint">
+            <i class="bi bi-info-circle"></i>
+            Supports multiple lines. Use Ctrl+Enter to save.
+        </small>
+        <div class="description-counter @GetCounterClass()">
+            @(CurrentValue?.Length ?? 0) / 2000
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool KeyDownPreventDefault { get; set; } = false;
+
+    private string? CurrentValue
+    {
+        get => Value;
+        set
+        {
+            if (Value != value)
+            {
+                Value = value;
+                ValueChanged.InvokeAsync(value);
+            }
+        }
+    }
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+    
+    [Parameter]
+    public EventCallback OnCtrlEnter { get; set; }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        KeyDownPreventDefault = false;
+        if (e.Key == "Enter" && e.CtrlKey)
+        {
+            KeyDownPreventDefault = true;
+            await OnCtrlEnter.InvokeAsync();
+        }
+    }
+
+    private void ClearDescription()
+    {
+        CurrentValue = "";
+    }
+
+    private string GetCounterClass()
+    {
+        var length = CurrentValue?.Length ?? 0;
+        if (length > 1800) return "danger";
+        if (length > 1500) return "warning";
+        return "";
+    }
+}

@@ -1,0 +1,89 @@
+/* === Description Textarea 스타일 === */
+.description-textarea {
+    min-height: 100px;
+    max-height: 300px;
+    resize: vertical;
+    font-family: inherit;
+    line-height: 1.5;
+    font-size: 0.9rem;
+}
+
+.description-textarea:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+    background-color: #fff;
+}
+
+/* 글자 수 표시 스타일 */
+.description-counter {
+    font-size: 0.75rem;
+    color: #6c757d;
+    text-align: right;
+}
+
+.description-counter.warning {
+    color: #f0ad4e;
+}
+
+.description-counter.danger {
+    color: #d9534f;
+}
+
+/* 스크롤바 스타일링 */
+.description-textarea::-webkit-scrollbar {
+    width: 8px;
+}
+
+.description-textarea::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.description-textarea::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.description-textarea::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+.description-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.description-tools {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.btn-tool {
+    background: none;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 3px;
+    transition: color 0.2s;
+}
+
+.btn-tool:hover {
+    color: #495057;
+    background-color: rgba(0,0,0,0.05);
+}
+
+.description-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.25rem;
+}
+
+.description-hint {
+    color: #6c757d;
+    font-size: 0.75rem;
+}

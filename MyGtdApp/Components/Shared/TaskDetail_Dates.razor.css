@@ -1,0 +1,12 @@
+.date-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+@media (max-width: 576px) {
+    .date-group {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+}
