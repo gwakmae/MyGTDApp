@@ -22,7 +22,7 @@ public class TaskMoveService : ITaskMoveService
         await MoveTasksAsync(new List<int> { taskId }, newStatus, newParentId, newSortOrder);
     }
 
-    // 🚀 [로직 전면 재작성] '같은 목록 내 이동' 시나리오를 명확히 분리하여 처리
+    // 🚀 [로직 전면 재작성] '루트 노드'를 식별하여 계층 구조를 보존하는 최종 해결책
     public async Task MoveTasksAsync(List<int> taskIds, TaskStatus newStatus, int? newParentId, int newSortOrder)
     {
         if (taskIds == null || !taskIds.Any()) return;
@@ -41,95 +41,90 @@ public class TaskMoveService : ITaskMoveService
                 return;
             }
 
-            var firstTask = allTasksInDb.FirstOrDefault(t => t.Id == taskIds[0]);
-            if (firstTask == null)
+            var selectedTasks = allTasksInDb.Where(t => taskIds.Contains(t.Id)).ToList();
+            if (!selectedTasks.Any())
             {
                 await transaction.RollbackAsync();
                 return;
             }
-            int? oldParentId = firstTask.ParentId;
-            TaskStatus oldStatus = firstTask.Status;
 
+            var selectedIdsSet = new HashSet<int>(taskIds);
+            var rootTasksToMove = selectedTasks
+                .Where(t => t.ParentId == null || !selectedIdsSet.Contains(t.ParentId.Value))
+                .OrderBy(t => t.SortOrder)
+                .ToList();
+
+            if (!rootTasksToMove.Any())
+            {
+                await transaction.RollbackAsync();
+                return;
+            }
+
+            int? oldParentId = rootTasksToMove.First().ParentId;
+            TaskStatus oldStatus = rootTasksToMove.First().Status;
             bool isMoveInSameList = oldParentId == newParentId && oldStatus == newStatus;
 
-            // --- 1. 메모리에서 최종 순서 목록 생성 ---
-            var finalOrderedList = new List<TaskItem>();
-            var tasksToUpdateInDb = new List<TaskItem>();
+            var finalSortOrders = new Dictionary<int, int>();
 
             if (isMoveInSameList)
             {
-                // [시나리오 1: 같은 목록 내에서 이동]
                 var siblings = allTasksInDb
                     .Where(t => t.ParentId == oldParentId && t.Status == oldStatus)
-                    .OrderBy(t => t.SortOrder)
-                    .ToList();
+                    .OrderBy(t => t.SortOrder).ToList();
+                var remaining = siblings.Where(t => !taskIds.Contains(t.Id)).ToList();
 
-                var tasksToMove = siblings.Where(t => taskIds.Contains(t.Id)).ToList();
-                var remainingTasks = siblings.Except(tasksToMove).ToList();
+                newSortOrder = Math.Clamp(newSortOrder, 0, remaining.Count);
+                remaining.InsertRange(newSortOrder, rootTasksToMove);
 
-                newSortOrder = Math.Clamp(newSortOrder, 0, remainingTasks.Count);
-                remainingTasks.InsertRange(newSortOrder, tasksToMove);
-
-                finalOrderedList = remainingTasks;
+                finalSortOrders = remaining.Select((t, i) => new { t.Id, Index = i }).ToDictionary(x => x.Id, x => x.Index);
             }
             else
             {
-                // [시나리오 2: 다른 목록으로 이동]
                 var oldSiblings = allTasksInDb
                     .Where(t => t.ParentId == oldParentId && t.Status == oldStatus && !allAffectedIds.Contains(t.Id))
-                    .OrderBy(t => t.SortOrder)
-                    .ToList();
+                    .OrderBy(t => t.SortOrder).ToList();
 
-                var destinationSiblings = allTasksInDb
+                var destSiblings = allTasksInDb
                     .Where(t => t.ParentId == newParentId && t.Status == newStatus && !allAffectedIds.Contains(t.Id))
-                    .OrderBy(t => t.SortOrder)
-                    .ToList();
+                    .OrderBy(t => t.SortOrder).ToList();
 
-                var topLevelTasksToMove = allTasksInDb.Where(t => taskIds.Contains(t.Id)).OrderBy(t => t.SortOrder).ToList();
+                newSortOrder = Math.Clamp(newSortOrder, 0, destSiblings.Count);
+                destSiblings.InsertRange(newSortOrder, rootTasksToMove);
 
-                newSortOrder = Math.Clamp(newSortOrder, 0, destinationSiblings.Count);
-                destinationSiblings.InsertRange(newSortOrder, topLevelTasksToMove);
-
-                // 각 목록은 독립적으로 0부터 재정렬
-                for (int i = 0; i < oldSiblings.Count; i++) oldSiblings[i].SortOrder = i;
-                for (int i = 0; i < destinationSiblings.Count; i++) destinationSiblings[i].SortOrder = i;
-
-                finalOrderedList.AddRange(oldSiblings);
-                finalOrderedList.AddRange(destinationSiblings);
+                for (int i = 0; i < oldSiblings.Count; i++) finalSortOrders[oldSiblings[i].Id] = i;
+                for (int i = 0; i < destSiblings.Count; i++) finalSortOrders[destSiblings[i].Id] = i;
             }
 
-            // --- 2. DB 엔티티를 로드하여 최종 상태 적용 ---
-            var allIdsToUpdate = finalOrderedList.Select(t => t.Id).Union(allAffectedIds);
-            tasksToUpdateInDb = await context.Tasks.Where(t => allIdsToUpdate.Contains(t.Id)).ToListAsync();
-            var finalOrderMap = finalOrderedList.Select((task, index) => new { task.Id, NewSortOrder = index })
-                                                .ToDictionary(x => x.Id, x => x.NewSortOrder);
+            var allIdsToUpdate = allAffectedIds.Union(finalSortOrders.Keys);
+            var tasksToUpdateInDb = await context.Tasks.Where(t => allIdsToUpdate.Contains(t.Id)).ToListAsync();
+            var tasksMap = tasksToUpdateInDb.ToDictionary(t => t.Id);
 
-            foreach (var task in tasksToUpdateInDb)
+            foreach (var affectedId in allAffectedIds)
             {
-                // 이동 그룹에 속한 항목들의 상태/부모 변경
-                if (allAffectedIds.Contains(task.Id))
+                if (tasksMap.TryGetValue(affectedId, out var task))
                 {
                     task.Status = newStatus;
-                    if (taskIds.Contains(task.Id)) // 최상위 이동 항목만 ParentId 변경
+                    if (rootTasksToMove.Any(r => r.Id == task.Id))
                     {
                         task.ParentId = newParentId;
                     }
                 }
+            }
 
-                // 최종 순서 적용
-                if (finalOrderMap.TryGetValue(task.Id, out var newOrder))
+            foreach (var kvp in finalSortOrders)
+            {
+                if (tasksMap.TryGetValue(kvp.Key, out var task))
                 {
-                    task.SortOrder = newOrder;
+                    task.SortOrder = kvp.Value;
                 }
             }
 
             await context.SaveChangesAsync();
 
-            // --- 3. Path/Depth 업데이트 ---
-            var movedTopLevelTasksInDb = tasksToUpdateInDb.Where(t => taskIds.Contains(t.Id)).ToList();
-            foreach (var task in movedTopLevelTasksInDb)
+            var trackedRootTasks = tasksToUpdateInDb.Where(t => rootTasksToMove.Any(r => r.Id == t.Id)).ToList();
+            foreach (var rootTask in trackedRootTasks)
             {
-                await UpdatePathDepthRecursiveAsync(context, task);
+                await UpdatePathDepthRecursiveAsync(context, rootTask);
             }
 
             await context.SaveChangesAsync();

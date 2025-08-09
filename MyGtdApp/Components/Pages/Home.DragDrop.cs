@@ -14,25 +14,22 @@ public partial class Home
                         .OrderBy(t => t.SortOrder)
                         .ToList();
 
-    // 🚀 [핵심 수정] 아래 HandleDragStart 메서드를 새로운 코드로 교체합니다.
+    // 🚀 [핵심 수정] 단일/다중 드래그를 모두 올바르게 처리하도록 로직 재구성
     private void HandleDragStart(int id)
     {
-        // 항상 물리적으로 드래그되는 아이템의 ID를 설정합니다.
         draggedTaskId = id;
 
-        // 만약 현재 드래그를 시작한 항목이 기존 선택 목록에 포함되어 있지 않다면,
-        // 이는 새로운 단일 드래그로 간주합니다.
+        // 드래그 시작한 항목이 현재 선택 목록에 없으면,
+        // 이는 새로운 단일 항목 드래그로 간주한다.
         if (!selectedTaskIds.Contains(id))
         {
-            // 기존 선택을 모두 지우고, 현재 항목만 새로 선택합니다.
+            // 기존 선택을 모두 지우고, 선택 모드를 해제한다.
             selectedTaskIds.Clear();
-            selectedTaskIds.Add(id);
-            lastClickedTaskId = id;
-            isMultiSelectMode = false; // 혹시 모르니 플래그도 초기화
+            isMultiSelectMode = false;
             StateHasChanged();
         }
-        // 만약 드래그 시작 항목이 기존 선택 목록에 이미 포함되어 있다면,
-        // 아무것도 하지 않습니다. 드롭 시점에 selectedTaskIds 전체가 이동될 것입니다.
+        // 드래그 시작한 항목이 선택 목록에 있으면,
+        // 다중 항목 이동으로 간주하고 선택 상태를 유지한다.
     }
 
     private async Task HandleDragEnd()
@@ -51,18 +48,14 @@ public partial class Home
 
         var siblings = GetTasksForStatus(targetStatus);
 
-        if (selectedTaskIds.Any())
-        {
-            await TaskService.MoveTasksAsync(selectedTaskIds, targetStatus, null, siblings.Count);
-        }
-        else
-        {
-            await TaskService.MoveTaskAsync(draggedTaskId, targetStatus, null, siblings.Count);
-        }
+        // 🚀 [핵심 수정] 이동할 ID 목록을 명확하게 결정
+        var idsToMove = selectedTaskIds.Contains(draggedTaskId)
+            ? new List<int>(selectedTaskIds)
+            : new List<int> { draggedTaskId };
+
+        await TaskService.MoveTasksAsync(idsToMove, targetStatus, null, siblings.Count);
 
         draggedTaskId = 0;
-
-        // ✅ [추가] UI 동기화를 위해 데이터 다시 로드
         await RefreshDataBasedOnRoute();
     }
 
@@ -70,25 +63,28 @@ public partial class Home
     {
         if (draggedTaskId == 0) return;
 
-        if (selectedTaskIds.Contains(targetTaskId)) return;
+        // 🚀 [핵심 수정] 이동할 ID 목록을 명확하게 결정
+        var idsToMove = selectedTaskIds.Contains(draggedTaskId)
+            ? new List<int>(selectedTaskIds)
+            : new List<int> { draggedTaskId };
+
+        // 자기 자신 또는 자신의 자손에게 드롭하는 것을 방지 (다중 선택 포함)
+        if (idsToMove.Contains(targetTaskId)) return;
 
         var targetTask = FindTaskById(allTopLevelTasks, targetTaskId) ??
                          FindTaskById(contextTasks, targetTaskId);
         if (targetTask == null) return;
 
-        if (selectedTaskIds.Any())
+        var allDescendantsOfSelected = new List<int>();
+        foreach (var id in idsToMove)
         {
-            var allDescendantsOfSelected = new List<int>();
-            foreach (var id in selectedTaskIds)
+            var task = FindTaskById(allTopLevelTasks, id) ?? FindTaskById(contextTasks, id);
+            if (task != null)
             {
-                var task = FindTaskById(allTopLevelTasks, id) ?? FindTaskById(contextTasks, id);
-                if (task != null)
-                {
-                    allDescendantsOfSelected.AddRange(GetAllDescendantIds(task));
-                }
+                allDescendantsOfSelected.AddRange(GetAllDescendantIds(task));
             }
-            if (allDescendantsOfSelected.Contains(targetTaskId)) return;
         }
+        if (allDescendantsOfSelected.Contains(targetTaskId)) return;
 
         var (parentId, sortOrder) = position switch
         {
@@ -98,19 +94,9 @@ public partial class Home
             _ => (null, 0)
         };
 
-        if (selectedTaskIds.Any())
-        {
-            await TaskService.MoveTasksAsync(selectedTaskIds, targetTask.Status, parentId, sortOrder);
-        }
-        else
-        {
-            if (draggedTaskId == targetTaskId) return;
-            await TaskService.MoveTaskAsync(draggedTaskId, targetTask.Status, parentId, sortOrder);
-        }
+        await TaskService.MoveTasksAsync(idsToMove, targetTask.Status, parentId, sortOrder);
 
         draggedTaskId = 0;
-
-        // ✅ [추가] UI 동기화를 위해 데이터 다시 로드
         await RefreshDataBasedOnRoute();
     }
 
