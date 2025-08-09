@@ -17,14 +17,12 @@ public class TaskMoveService : ITaskMoveService
         _dbContextFactory = dbContextFactory;
     }
 
-    // 기존 단일 이동 메서드
     public async Task MoveTaskAsync(int taskId, TaskStatus newStatus, int? newParentId, int newSortOrder)
     {
-        // 🔄 수정: 단일 이동을 다중 이동의 특수한 경우로 처리하여 코드 재사용
         await MoveTasksAsync(new List<int> { taskId }, newStatus, newParentId, newSortOrder);
     }
 
-    // 🆕 추가: 새로운 다중 이동 핵심 메서드
+    // 🚀 [로직 전면 재작성] '같은 목록 내 이동' 시나리오를 명확히 분리하여 처리
     public async Task MoveTasksAsync(List<int> taskIds, TaskStatus newStatus, int? newParentId, int newSortOrder)
     {
         if (taskIds == null || !taskIds.Any()) return;
@@ -34,69 +32,112 @@ public class TaskMoveService : ITaskMoveService
 
         try
         {
-            // --- 1. 전체 이동 대상 확정 (선택된 항목 + 모든 자손) ---
-            var allTasks = await context.Tasks.AsNoTracking().ToListAsync();
-            var allAffectedIds = GetAllAffectedIds(taskIds, allTasks);
+            var allTasksInDb = await context.Tasks.AsNoTracking().ToListAsync();
+            var allAffectedIds = GetAllAffectedIds(taskIds, allTasksInDb);
 
-            // --- 2. 유효성 검사 (순환 참조 방지) ---
             if (newParentId.HasValue && allAffectedIds.Contains(newParentId.Value))
             {
-                // 자신의 자손 밑으로 이동하려는 시도 차단
                 await transaction.RollbackAsync();
                 return;
             }
-            
-            // --- 3. DB에서 실제 Task 엔티티 가져오기 ---
-            var tasksToMove = await context.Tasks.Where(t => taskIds.Contains(t.Id)).ToListAsync();
-            
-            // --- 4. 기존 위치 정리 (형제들 순서 재정렬) ---
-            var tasksByOldParent = tasksToMove.GroupBy(t => new { t.ParentId, t.Status });
-            foreach (var group in tasksByOldParent)
+
+            var firstTask = allTasksInDb.FirstOrDefault(t => t.Id == taskIds[0]);
+            if (firstTask == null)
             {
-                var siblings = await context.Tasks
-                    .Where(t => t.ParentId == group.Key.ParentId && t.Status == group.Key.Status && !taskIds.Contains(t.Id))
+                await transaction.RollbackAsync();
+                return;
+            }
+            int? oldParentId = firstTask.ParentId;
+            TaskStatus oldStatus = firstTask.Status;
+
+            bool isMoveInSameList = oldParentId == newParentId && oldStatus == newStatus;
+
+            // --- 1. 메모리에서 최종 순서 목록 생성 ---
+            var finalOrderedList = new List<TaskItem>();
+            var tasksToUpdateInDb = new List<TaskItem>();
+
+            if (isMoveInSameList)
+            {
+                // [시나리오 1: 같은 목록 내에서 이동]
+                var siblings = allTasksInDb
+                    .Where(t => t.ParentId == oldParentId && t.Status == oldStatus)
                     .OrderBy(t => t.SortOrder)
-                    .ToListAsync();
-                for (int i = 0; i < siblings.Count; i++) siblings[i].SortOrder = i;
+                    .ToList();
+
+                var tasksToMove = siblings.Where(t => taskIds.Contains(t.Id)).ToList();
+                var remainingTasks = siblings.Except(tasksToMove).ToList();
+
+                newSortOrder = Math.Clamp(newSortOrder, 0, remainingTasks.Count);
+                remainingTasks.InsertRange(newSortOrder, tasksToMove);
+
+                finalOrderedList = remainingTasks;
+            }
+            else
+            {
+                // [시나리오 2: 다른 목록으로 이동]
+                var oldSiblings = allTasksInDb
+                    .Where(t => t.ParentId == oldParentId && t.Status == oldStatus && !allAffectedIds.Contains(t.Id))
+                    .OrderBy(t => t.SortOrder)
+                    .ToList();
+
+                var destinationSiblings = allTasksInDb
+                    .Where(t => t.ParentId == newParentId && t.Status == newStatus && !allAffectedIds.Contains(t.Id))
+                    .OrderBy(t => t.SortOrder)
+                    .ToList();
+
+                var topLevelTasksToMove = allTasksInDb.Where(t => taskIds.Contains(t.Id)).OrderBy(t => t.SortOrder).ToList();
+
+                newSortOrder = Math.Clamp(newSortOrder, 0, destinationSiblings.Count);
+                destinationSiblings.InsertRange(newSortOrder, topLevelTasksToMove);
+
+                // 각 목록은 독립적으로 0부터 재정렬
+                for (int i = 0; i < oldSiblings.Count; i++) oldSiblings[i].SortOrder = i;
+                for (int i = 0; i < destinationSiblings.Count; i++) destinationSiblings[i].SortOrder = i;
+
+                finalOrderedList.AddRange(oldSiblings);
+                finalOrderedList.AddRange(destinationSiblings);
             }
 
-            // --- 5. 새 위치의 형제들 가져오기 ---
-            var newSiblings = await context.Tasks
-                .Where(t => t.ParentId == newParentId && t.Status == newStatus && !taskIds.Contains(t.Id))
-                .OrderBy(t => t.SortOrder)
-                .ToListAsync();
+            // --- 2. DB 엔티티를 로드하여 최종 상태 적용 ---
+            var allIdsToUpdate = finalOrderedList.Select(t => t.Id).Union(allAffectedIds);
+            tasksToUpdateInDb = await context.Tasks.Where(t => allIdsToUpdate.Contains(t.Id)).ToListAsync();
+            var finalOrderMap = finalOrderedList.Select((task, index) => new { task.Id, NewSortOrder = index })
+                                                .ToDictionary(x => x.Id, x => x.NewSortOrder);
 
-            // --- 6. 이동 작업 수행 (평탄화 및 정렬) ---
-            newSortOrder = Math.Clamp(newSortOrder, 0, newSiblings.Count);
-            
-            // 먼저 기존 형제들의 순서를 뒤로 밀어 공간 확보
-            foreach (var sibling in newSiblings.Skip(newSortOrder))
+            foreach (var task in tasksToUpdateInDb)
             {
-                sibling.SortOrder += tasksToMove.Count;
-            }
+                // 이동 그룹에 속한 항목들의 상태/부모 변경
+                if (allAffectedIds.Contains(task.Id))
+                {
+                    task.Status = newStatus;
+                    if (taskIds.Contains(task.Id)) // 최상위 이동 항목만 ParentId 변경
+                    {
+                        task.ParentId = newParentId;
+                    }
+                }
 
-            // 선택된 항목들을 새 위치에 순서대로 삽입
-            var currentSortOrder = newSortOrder;
-            foreach (var task in tasksToMove.OrderBy(t => t.SortOrder))
-            {
-                task.ParentId = newParentId;
-                task.Status = newStatus;
-                task.SortOrder = currentSortOrder++;
+                // 최종 순서 적용
+                if (finalOrderMap.TryGetValue(task.Id, out var newOrder))
+                {
+                    task.SortOrder = newOrder;
+                }
             }
 
             await context.SaveChangesAsync();
 
-            // --- 7. Path 및 Depth 재귀적 업데이트 ---
-            foreach (var task in tasksToMove)
+            // --- 3. Path/Depth 업데이트 ---
+            var movedTopLevelTasksInDb = tasksToUpdateInDb.Where(t => taskIds.Contains(t.Id)).ToList();
+            foreach (var task in movedTopLevelTasksInDb)
             {
                 await UpdatePathDepthRecursiveAsync(context, task);
             }
-            
+
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[MOVE ERROR] {ex.Message}\n{ex.StackTrace}");
             await transaction.RollbackAsync();
             throw;
         }
@@ -136,13 +177,12 @@ public class TaskMoveService : ITaskMoveService
         }
         else
         {
-            // 🔄 수정: FindAsync 대신 비동기 메서드 SingleOrDefaultAsync 사용
-            var parent = await ctx.Tasks.SingleOrDefaultAsync(t => t.Id == node.ParentId.Value);
-            if(parent == null) throw new InvalidOperationException($"Parent task with ID {node.ParentId} not found.");
+            var parent = await ctx.Tasks.AsNoTracking().SingleOrDefaultAsync(t => t.Id == node.ParentId.Value);
+            if (parent == null) throw new InvalidOperationException($"Parent task with ID {node.ParentId} not found during Path update.");
             node.Path = $"{parent.Path}/{Pad(node.Id)}";
             node.Depth = parent.Depth + 1;
         }
-        
+
         var children = await ctx.Tasks.Where(t => t.ParentId == node.Id).ToListAsync();
         foreach (var child in children)
         {

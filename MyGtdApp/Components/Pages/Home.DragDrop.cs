@@ -14,37 +14,25 @@ public partial class Home
                         .OrderBy(t => t.SortOrder)
                         .ToList();
 
+    // 🚀 [핵심 수정] 아래 HandleDragStart 메서드를 새로운 코드로 교체합니다.
     private void HandleDragStart(int id)
     {
         // 항상 물리적으로 드래그되는 아이템의 ID를 설정합니다.
         draggedTaskId = id;
 
-        // 만약 공식적인 다중 선택 모드가 아니라면 (즉, 한 손가락 롱프레스 드래그)
-        if (!isMultiSelectMode)
+        // 만약 현재 드래그를 시작한 항목이 기존 선택 목록에 포함되어 있지 않다면,
+        // 이는 새로운 단일 드래그로 간주합니다.
+        if (!selectedTaskIds.Contains(id))
         {
-            // 이전에 선택된 항목이 남아있을 수 있으므로 모두 초기화합니다.
-            if (selectedTaskIds.Any())
-            {
-                selectedTaskIds.Clear();
-                lastClickedTaskId = null;
-                isBulkEditPanelVisible = false;
-                StateHasChanged();
-            }
-            // 핵심: 한 손가락 드래그 시에는 selectedTaskIds에 아무것도 추가하지 않습니다.
+            // 기존 선택을 모두 지우고, 현재 항목만 새로 선택합니다.
+            selectedTaskIds.Clear();
+            selectedTaskIds.Add(id);
+            lastClickedTaskId = id;
+            isMultiSelectMode = false; // 혹시 모르니 플래그도 초기화
+            StateHasChanged();
         }
-        else // 다중 선택 모드일 때
-        {
-            // 만약 선택된 그룹의 일부가 아닌 다른 항목을 드래그 시작했다면,
-            // 기존 선택을 모두 해제하고 새로 드래그한 항목만 선택된 것으로 간주합니다.
-            if (!selectedTaskIds.Contains(id))
-            {
-                selectedTaskIds.Clear();
-                selectedTaskIds.Add(id);
-                lastClickedTaskId = id;
-                StateHasChanged();
-            }
-            // 선택된 그룹 내의 항목을 드래그했다면, 선택 상태를 그대로 유지합니다.
-        }
+        // 만약 드래그 시작 항목이 기존 선택 목록에 이미 포함되어 있다면,
+        // 아무것도 하지 않습니다. 드롭 시점에 selectedTaskIds 전체가 이동될 것입니다.
     }
 
     private async Task HandleDragEnd()
@@ -63,7 +51,6 @@ public partial class Home
 
         var siblings = GetTasksForStatus(targetStatus);
 
-        // 🔄 수정: 다중/단일 이동 분기 처리
         if (selectedTaskIds.Any())
         {
             await TaskService.MoveTasksAsync(selectedTaskIds, targetStatus, null, siblings.Count);
@@ -74,20 +61,21 @@ public partial class Home
         }
 
         draggedTaskId = 0;
+
+        // ✅ [추가] UI 동기화를 위해 데이터 다시 로드
+        await RefreshDataBasedOnRoute();
     }
 
     private async Task HandleDropOnProject(int targetTaskId, ProjectTaskNode.DropIndicator position)
     {
         if (draggedTaskId == 0) return;
 
-        // 🔄 수정: 다중 선택 시 자기 자신이나 자손에게 드롭하는 것 방지
         if (selectedTaskIds.Contains(targetTaskId)) return;
 
         var targetTask = FindTaskById(allTopLevelTasks, targetTaskId) ??
                          FindTaskById(contextTasks, targetTaskId);
         if (targetTask == null) return;
 
-        // 🆕 추가: 다중 선택 시 순환 참조 방지 강화
         if (selectedTaskIds.Any())
         {
             var allDescendantsOfSelected = new List<int>();
@@ -102,7 +90,6 @@ public partial class Home
             if (allDescendantsOfSelected.Contains(targetTaskId)) return;
         }
 
-
         var (parentId, sortOrder) = position switch
         {
             ProjectTaskNode.DropIndicator.Inside => (targetTask.Id, targetTask.Children.Count),
@@ -111,18 +98,20 @@ public partial class Home
             _ => (null, 0)
         };
 
-        // 🔄 수정: 다중/단일 이동 분기 처리
         if (selectedTaskIds.Any())
         {
             await TaskService.MoveTasksAsync(selectedTaskIds, targetTask.Status, parentId, sortOrder);
         }
         else
         {
-            if (draggedTaskId == targetTaskId) return; // 단일 이동 시 자기 자신에게 드롭 방지
+            if (draggedTaskId == targetTaskId) return;
             await TaskService.MoveTaskAsync(draggedTaskId, targetTask.Status, parentId, sortOrder);
         }
 
         draggedTaskId = 0;
+
+        // ✅ [추가] UI 동기화를 위해 데이터 다시 로드
+        await RefreshDataBasedOnRoute();
     }
 
     private TaskItem? FindTaskById(IEnumerable<TaskItem> list, int id)
@@ -136,7 +125,6 @@ public partial class Home
         return null;
     }
 
-    // 🆕 추가: 특정 작업의 모든 자손 ID를 가져오는 헬퍼 메서드
     private List<int> GetAllDescendantIds(TaskItem parent)
     {
         var ids = new List<int>();
