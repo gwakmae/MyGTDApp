@@ -1,89 +1,432 @@
-/* === Description Textarea 스타일 === */
-.description-textarea {
-    min-height: 100px;
-    max-height: 300px;
-    resize: vertical;
-    font-family: inherit;
-    line-height: 1.5;
-    font-size: 0.9rem;
-}
-
-.description-textarea:focus {
-    border-color: #80bdff;
-    outline: 0;
-    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
-    background-color: #fff;
-}
-
-/* 글자 수 표시 스타일 */
-.description-counter {
-    font-size: 0.75rem;
-    color: #6c757d;
-    text-align: right;
-}
-
-.description-counter.warning {
-    color: #f0ad4e;
-}
-
-.description-counter.danger {
-    color: #d9534f;
-}
-
-/* 스크롤바 스타일링 */
-.description-textarea::-webkit-scrollbar {
-    width: 8px;
-}
-
-.description-textarea::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-}
-
-.description-textarea::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 4px;
-}
-
-.description-textarea::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+/* 일반 모드 스타일 */
+.description-group {
+    margin-bottom: 1.5rem;
 }
 
 .description-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e5e7eb;
 }
 
-.description-tools {
+.description-label {
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+    font-size: 1rem;
     display: flex;
-    gap: 0.25rem;
+    align-items: center;
+    gap: 0.5rem;
 }
 
-.btn-tool {
-    background: none;
+    .description-label i {
+        color: #3b82f6;
+        font-size: 1.1rem;
+    }
+
+.btn-expand {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
     border: none;
-    color: #6c757d;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
     cursor: pointer;
-    padding: 0.25rem;
-    border-radius: 3px;
-    transition: color 0.2s;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
 }
 
-.btn-tool:hover {
-    color: #495057;
-    background-color: rgba(0,0,0,0.05);
+    .btn-expand:hover {
+        background: linear-gradient(135deg, #2563eb, #1e40af);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+    }
+
+.textarea-container {
+    position: relative;
+    margin-bottom: 0.75rem;
+}
+
+.description-textarea {
+    width: 100%;
+    border: 2px solid #d1d5db;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    resize: vertical;
+    transition: all 0.3s ease;
+    background: linear-gradient(to bottom, #ffffff, #f9fafb);
+    min-height: 100px;
+}
+
+    .description-textarea:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        background: #ffffff;
+    }
+
+    .description-textarea.has-content {
+        background: #ffffff;
+        border-color: #10b981;
+    }
+
+.textarea-overlay {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: rgba(59, 130, 246, 0.05);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(1px);
+}
+
+.textarea-container:hover .textarea-overlay {
+    opacity: 1;
+}
+
+.overlay-content {
+    background: rgba(59, 130, 246, 0.9);
+    color: white;
+    padding: 0.75rem 1.25rem;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .description-footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 0.25rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid #f3f4f6;
 }
 
-.description-hint {
-    color: #6c757d;
-    font-size: 0.75rem;
+.quick-tips {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #6b7280;
+    font-size: 0.8rem;
+}
+
+    .quick-tips i {
+        color: #3b82f6;
+    }
+
+.char-count {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+    .char-count.warning {
+        color: #f59e0b;
+    }
+
+    .char-count.danger {
+        color: #ef4444;
+    }
+
+/* 풀스크린 모달 - 단순화된 구조 */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9998;
+}
+
+.fullscreen-modal {
+    position: fixed;
+    top: 5%;
+    left: 5%;
+    right: 5%;
+    bottom: 5%;
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* 모달 헤더 */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    border-bottom: 2px solid #e5e7eb;
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    border-radius: 1rem 1rem 0 0;
+}
+
+.modal-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+    .modal-title i {
+        color: #3b82f6;
+    }
+
+.close-btn {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    color: #dc2626;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    font-size: 1.1rem;
+}
+
+    .close-btn:hover {
+        background: #fecaca;
+        border-color: #f87171;
+        transform: scale(1.05);
+    }
+
+/* 모달 본문 */
+.modal-body {
+    flex: 1;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(to bottom, #ffffff, #f9fafb);
+}
+
+.modal-textarea {
+    width: 100%;
+    height: 100%;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 2rem;
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 1.1rem;
+    line-height: 1.7;
+    resize: none;
+    background: #ffffff;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+    .modal-textarea:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    }
+
+    .modal-textarea::placeholder {
+        color: #9ca3af;
+        line-height: 1.8;
+    }
+
+/* 모달 푸터 */
+.modal-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    border-top: 2px solid #e5e7eb;
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    border-radius: 0 0 1rem 1rem;
+}
+
+.footer-info {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.char-counter {
+    display: flex;
+    align-items: baseline;
+    gap: 0.25rem;
+}
+
+.char-count {
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+.char-max {
+    font-size: 0.875rem;
+    color: #64748b;
+}
+
+.shortcut-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #64748b;
+    font-size: 0.875rem;
+}
+
+    .shortcut-hint i {
+        color: #f59e0b;
+    }
+
+.footer-buttons {
+    display: flex;
+    gap: 1rem;
+}
+
+.modal-btn {
+    padding: 0.875rem 1.5rem;
+    border-radius: 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 2px solid transparent;
+    min-width: 120px;
+    justify-content: center;
+}
+
+.cancel-btn {
+    background: #ffffff;
+    color: #64748b;
+    border-color: #e2e8f0;
+}
+
+    .cancel-btn:hover {
+        background: #f8fafc;
+        color: #475569;
+        border-color: #cbd5e1;
+        transform: translateY(-1px);
+    }
+
+.save-btn {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #ffffff;
+    border-color: #10b981;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+    .save-btn:hover {
+        background: linear-gradient(135deg, #059669, #047857);
+        border-color: #059669;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+    }
+
+.modal-btn:active {
+    transform: translateY(0);
+}
+
+/* 모바일 반응형 */
+@media (max-width: 768px) {
+    .fullscreen-modal {
+        top: 2%;
+        left: 2%;
+        right: 2%;
+        bottom: 2%;
+    }
+
+    .modal-header {
+        padding: 1rem 1.5rem;
+    }
+
+    .modal-title {
+        font-size: 1.25rem;
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .modal-textarea {
+        padding: 1.5rem;
+        font-size: 16px; /* iOS 줌 방지 */
+    }
+
+    .modal-footer {
+        padding: 1rem 1.5rem;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .footer-info {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: flex-start;
+    }
+
+    .footer-buttons {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .modal-btn {
+        flex: 1;
+    }
+}
+
+/* 전체화면에서 모바일 */
+@media (max-width: 480px) {
+    .fullscreen-modal {
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border-radius: 0;
+    }
+
+    .modal-header {
+        border-radius: 0;
+    }
+
+    .modal-footer {
+        border-radius: 0;
+    }
 }

@@ -38,18 +38,43 @@
             }
         }).then(() => {
             let reconnectDelayTimer = null;
+            let isFirstReconnectAttempt = true;
+
+            // 🆕 모바일/데스크톱 감지
+            const isMobile = () => {
+                return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+                       || window.innerWidth <= 1199;
+            };
+
+            // 🆕 연결 상태에 따른 지연 시간 계산
+            const getDelayTime = () => {
+                if (isMobile()) {
+                    return isFirstReconnectAttempt ? 12000 : 8000; // 모바일: 첫 시도 12초, 이후 8초
+                } else {
+                    return isFirstReconnectAttempt ? 8000 : 5000;  // 데스크톱: 첫 시도 8초, 이후 5초
+                }
+            };
 
             // ✅ 안전한 접근으로 수정
             if (Blazor.defaultReconnectionHandler && Blazor.defaultReconnectionHandler._reconnectionDisplay) {
                 // 재연결 UI 지연 표시
                 const originalShow = Blazor.defaultReconnectionHandler._reconnectionDisplay.show;
                 Blazor.defaultReconnectionHandler._reconnectionDisplay.show = function() {
+                    const delayTime = getDelayTime();
+
+                    console.log(`[RECONNECT] ${delayTime/1000}초 후 재연결 UI 표시 예정 (${isMobile() ? '모바일' : '데스크톱'})`);
+
                     reconnectDelayTimer = setTimeout(() => {
-                        if (originalShow) originalShow.call(this);
-                    }, 5000); // 5초 지연
+                        if (originalShow) {
+                            console.log('[RECONNECT] 재연결 UI 표시');
+                            originalShow.call(this);
+                        }
+                    }, delayTime);
+
+                    isFirstReconnectAttempt = false;
                 };
 
-                // 재연결 성공 시 타이머 취소
+                // 재연결 성공 시 타이머 취소 및 상태 리셋
                 const originalHide = Blazor.defaultReconnectionHandler._reconnectionDisplay.hide;
                 Blazor.defaultReconnectionHandler._reconnectionDisplay.hide = function() {
                     if (reconnectDelayTimer) {
@@ -57,28 +82,40 @@
                         reconnectDelayTimer = null;
                     }
                     if (originalHide) originalHide.call(this);
+
+                    // 🆕 성공적으로 연결되면 다음번을 위해 리셋
+                    isFirstReconnectAttempt = true;
+                    console.log('[RECONNECT] 재연결 성공 - 상태 리셋');
                 };
             }
+
+            // 🆕 탭 활성화 감지 개선
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) {
+                    console.log('[RECONNECT] 탭이 다시 활성화됨');
+
+                    // 모바일에서는 더 여유롭게 기다림
+                    const graceTime = isMobile() ? 3000 : 1000;
+
+                    setTimeout(() => {
+                        if (Blazor.defaultReconnectionHandler &&
+                            Blazor.defaultReconnectionHandler._currentReconnectionProcess) {
+                            console.log('[RECONNECT] 재연결이 필요한 상황 - 페이지 새로고침');
+                            document.location.reload();
+                        }
+                    }, graceTime);
+                }
+            });
 
             // 최종 실패 시 자동 새로고침
             if (Blazor.defaultReconnectionHandler) {
                 Blazor.defaultReconnectionHandler._reconnectCallback = function (d) {
+                    console.log('[RECONNECT] 최종 실패 - 페이지 새로고침');
                     document.location.reload();
                 };
             }
         }).catch(error => {
             console.error('Blazor 시작 실패:', error);
-        });
-
-        // 탭 활성화 시 연결 확인
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden &&
-                Blazor.defaultReconnectionHandler &&
-                Blazor.defaultReconnectionHandler._currentReconnectionProcess) {
-                setTimeout(() => {
-                    document.location.reload();
-                }, 2000);
-            }
         });
     </script>
 

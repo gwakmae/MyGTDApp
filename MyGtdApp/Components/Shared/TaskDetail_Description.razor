@@ -1,36 +1,127 @@
-@using Microsoft.AspNetCore.Components.Web
+﻿@using Microsoft.AspNetCore.Components.Web
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
 
-<div class="form-group">
-    <div class="description-header">
-        <label for="description">Description</label>
-        <div class="description-tools">
-            <button type="button" class="btn-tool" @onclick="ClearDescription" title="Clear">
-                <i class="bi bi-x-circle"></i>
+@if (_isFullscreen)
+{
+    <!-- 풀스크린 모드 - 단순화된 레이아웃 -->
+    <div class="fullscreen-modal">
+        <!-- 상단 바 -->
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="bi bi-textarea-resize"></i>
+                Description Editor
+            </h3>
+            <button type="button" class="close-btn" @onclick="ExitFullscreen" title="Close (ESC)">
+                <i class="bi bi-x-lg"></i>
             </button>
         </div>
-    </div>
-    <textarea id="description"
-              class="form-control description-textarea"
-              rows="4"
-              placeholder="Enter detailed description, notes, or checklist..."
-              maxlength="2000"
-              @bind="CurrentValue"
-              @bind:event="oninput"
-              @onkeydown="HandleKeyDown"
-              @onkeydown:preventDefault="KeyDownPreventDefault"></textarea>
-    <div class="description-footer">
-        <small class="description-hint">
-            <i class="bi bi-info-circle"></i>
-            Supports multiple lines. Use Ctrl+Enter to save.
-        </small>
-        <div class="description-counter @GetCounterClass()">
-            @(CurrentValue?.Length ?? 0) / 2000
+
+        <!-- 텍스트 영역 -->
+        <div class="modal-body">
+            <textarea class="modal-textarea"
+                      placeholder="Write your detailed description here...
+
+    • Use this space for comprehensive task descriptions
+    • Press Ctrl+Enter to save and close
+    • Press ESC to cancel without saving"
+                      maxlength="10000"
+                      @bind="CurrentValue"
+                      @bind:event="oninput"
+                      @onkeydown="HandleKeyDown"
+                      @onkeydown:preventDefault="KeyDownPreventDefault"
+                      @ref="fullscreenTextareaRef"></textarea>
+        </div>
+
+        <!-- 하단 버튼 영역 -->
+        <div class="modal-footer">
+            <div class="footer-info">
+                <span class="char-counter">
+                    <span class="char-count @GetCounterClass()">@(CurrentValue?.Length ?? 0)</span>
+                    <span class="char-max">/ 10,000</span>
+                </span>
+                <span class="shortcut-hint">
+                    <i class="bi bi-keyboard"></i>
+                    Ctrl+Enter to save, ESC to cancel
+                </span>
+            </div>
+            <div class="footer-buttons">
+                <button type="button" class="modal-btn cancel-btn" @onclick="ExitFullscreen">
+                    <i class="bi bi-x-circle"></i>
+                    Cancel
+                </button>
+                <button type="button" class="modal-btn save-btn" @onclick="SaveAndExit">
+                    <i class="bi bi-check-circle-fill"></i>
+                    Save & Close
+                </button>
+            </div>
         </div>
     </div>
-</div>
+
+    <!-- 배경 오버레이 -->
+    <div class="modal-backdrop" @onclick="ExitFullscreen"></div>
+}
+else
+{
+    <!-- 일반 모드 -->
+    <div class="form-group description-group">
+        <div class="description-header">
+            <label for="description" class="description-label">
+                <i class="bi bi-card-text"></i>
+                Description
+            </label>
+            <div class="description-actions">
+                <button type="button" class="btn-expand" @onclick="EnterFullscreen" title="Expand to Full Editor">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                    <span>Expand</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="textarea-container">
+            <textarea id="description"
+                      class="form-control description-textarea @GetTextareaClass()"
+                      rows="@GetTextareaRows()"
+                      placeholder="Click 'Expand' for detailed editing or type here for quick notes..."
+                      maxlength="10000"
+                      @bind="CurrentValue"
+                      @bind:event="oninput"
+                      @onkeydown="HandleKeyDown"
+                      @onkeydown:preventDefault="KeyDownPreventDefault"
+                      @ref="normalTextareaRef"></textarea>
+
+            @if (!string.IsNullOrEmpty(CurrentValue) && CurrentValue.Length > 100)
+            {
+                <div class="textarea-overlay" @onclick="EnterFullscreen">
+                    <div class="overlay-content">
+                        <i class="bi bi-arrows-fullscreen"></i>
+                        <span>Click to expand for better editing</span>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="description-footer">
+            <div class="footer-left">
+                <div class="quick-tips">
+                    <i class="bi bi-info-circle"></i>
+                    <span>For detailed descriptions, use the expanded editor</span>
+                </div>
+            </div>
+            <div class="footer-right">
+                <span class="char-count @GetCounterClass()">
+                    @(CurrentValue?.Length ?? 0) / 10,000
+                </span>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     private bool KeyDownPreventDefault { get; set; } = false;
+    private bool _isFullscreen = false;
+    private ElementReference normalTextareaRef;
+    private ElementReference fullscreenTextareaRef;
 
     private string? CurrentValue
     {
@@ -45,35 +136,96 @@
         }
     }
 
-    [Parameter]
-    public string? Value { get; set; }
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public EventCallback OnCtrlEnter { get; set; }
+    [Parameter] public EventCallback<bool> OnFullscreenToggle { get; set; }
 
-    [Parameter]
-    public EventCallback<string?> ValueChanged { get; set; }
-    
-    [Parameter]
-    public EventCallback OnCtrlEnter { get; set; }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_isFullscreen && firstRender)
+        {
+            await Task.Delay(100);
+            await SetFocusToFullscreenTextarea();
+        }
+    }
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
     {
         KeyDownPreventDefault = false;
+
         if (e.Key == "Enter" && e.CtrlKey)
         {
             KeyDownPreventDefault = true;
-            await OnCtrlEnter.InvokeAsync();
+            await SaveAndExit();
+        }
+        else if (e.Key == "Escape" && _isFullscreen)
+        {
+            KeyDownPreventDefault = true;
+            ExitFullscreen(); // async 제거
         }
     }
 
-    private void ClearDescription()
+    private void EnterFullscreen() // async 제거
     {
-        CurrentValue = "";
+        _isFullscreen = true;
+        OnFullscreenToggle.InvokeAsync(true); // await 제거
+        StateHasChanged();
+
+        // 포커스는 OnAfterRenderAsync에서 처리하므로 여기서는 제거
+    }
+    
+
+    private void ExitFullscreen() // async 제거
+    {
+        _isFullscreen = false;
+        OnFullscreenToggle.InvokeAsync(false); // await 제거
+        StateHasChanged();
+    }
+
+    private async Task SaveAndExit()
+    {
+        await OnCtrlEnter.InvokeAsync();
+        ExitFullscreen(); // await 제거
+    }
+
+    private async Task SetFocusToFullscreenTextarea()
+    {
+        try
+        {
+            await fullscreenTextareaRef.FocusAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"포커스 설정 실패: {ex.Message}");
+        }
     }
 
     private string GetCounterClass()
     {
         var length = CurrentValue?.Length ?? 0;
-        if (length > 1800) return "danger";
-        if (length > 1500) return "warning";
+        if (length > 8000) return "danger";
+        if (length > 6000) return "warning";
         return "";
+    }
+
+    private string GetTextareaClass()
+    {
+        var length = CurrentValue?.Length ?? 0;
+        return length > 100 ? "has-content" : "";
+    }
+
+    private int GetTextareaRows()
+    {
+        var length = CurrentValue?.Length ?? 0;
+        if (length > 200) return 8;
+        if (length > 100) return 6;
+        return 4;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // 정리 작업
+        await Task.CompletedTask;
     }
 }

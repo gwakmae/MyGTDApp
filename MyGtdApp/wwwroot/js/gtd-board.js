@@ -9,13 +9,30 @@ import * as utils from './modules/utils.js';         /* ⬅️ 추가 */
 export function setup(helper) {
     Constants.setDotNetHelper(helper);
 
+    // 🆕 추가: 모달 상태 체크 함수
+    const isModalOpen = () => {
+        return document.body.classList.contains('disable-task-interaction') ||
+            document.body.classList.contains('disable-task-selection') ||
+            document.querySelector('.modal-container') !== null;
+    };
+
+    // 🔧 기존 이벤트 리스너를 래핑하여 모달 상태 체크
+    const wrappedHandler = (e) => {
+        if (isModalOpen()) {
+            console.log('[DRAG] 모달 열린 상태 - 드래그 이벤트 무시');
+            return;
+        }
+        handler(e);
+    };
+
     // 기존 이벤트 리스너 제거 후 새로 등록
     ["touchstart", "touchmove", "touchend", "touchcancel"].forEach(ev => {
         document.removeEventListener(ev, handler, true);
-        document.addEventListener(ev, handler, { passive: false, capture: true });
+        document.removeEventListener(ev, wrappedHandler, true);
+        document.addEventListener(ev, wrappedHandler, { passive: false, capture: true });
     });
 
-    console.log("[DRAG] GTD Board 드래그 시스템 초기화 완료");
+    console.log("[DRAG] GTD Board 드래그 시스템 초기화 완료 (모달 보호 포함)");
 
     /* 사이드바 열림 시 RAF 취소 – 좌표 틀어짐 방지 */
     onSidebarToggled(() => {

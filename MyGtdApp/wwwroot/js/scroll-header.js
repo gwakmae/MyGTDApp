@@ -79,6 +79,14 @@ class ScrollHeaderController {
     }
 
     handleScroll() {
+        // 🚀 최종 수정: 풀스크린 모드일 때 헤더 스크롤 기능 비활성화
+        if (window.__SCROLL_HEADER_DISABLED === true) {
+            if (this.isHidden) {
+                this.showHeader(); // 만약 숨겨진 상태였다면, 안전하게 다시 보이도록 처리
+            }
+            return; // 이후 로직 실행 안 함
+        }
+
         if (!this.header || !this.isMobile()) return;
 
         const currentScrollY = window.scrollY;

@@ -6,60 +6,79 @@
 
 @implements IAsyncDisposable
 
-<div class="modal-backdrop" @onclick="HandleBackdropClick" @ontouchstart:preventDefault="false" @ontouchend="HandleBackdropTouch">
-    <div class="modal-container" @onclick:stopPropagation="true">
+<div class="modal-backdrop" @onclick="HandleBackdropClick" @ontouchstart="HandleTouchStart" @ontouchend="HandleTouchEnd">
+    <div class="modal-container @(_isDescriptionFullscreen ? "is-fullscreen-child" : "")" @onclick:stopPropagation="true" @ontouchstart:stopPropagation="true" @ontouchend:stopPropagation="true">
 
-        <div class="modal-header">
-            <h3>Edit Task Details</h3>
-            <button class="close-btn" @onclick="HandleClose">×</button>
-        </div>
-
-        <div class="modal-body">
-            @if (_localTask != null)
+        @if (_localTask != null)
+        {
+            @* 🚀 최종 수정: 풀스크린 상태에 따라 렌더링할 UI를 분기 *@
+            @if (_isDescriptionFullscreen)
             {
-                <form @onsubmit="HandleSave" @onsubmit:preventDefault="true">
-
-                    <TaskDetail_Title @bind-Value="_localTask.Title" OnEnter="HandleSave" />
-
-                    <TaskDetail_Description @bind-Value="_localTask.Description" OnCtrlEnter="HandleSave" />
-
-                    <!-- 🆕 Priority 설정 추가 -->
-                    <TaskDetail_Priority @bind-Value="_localTask.Priority" />
-
-                    <TaskDetail_Dates @bind-StartDate="_localTask.StartDate" @bind-DueDate="_localTask.DueDate" />
-
-                    <TaskDetail_Contexts @bind-SelectedContexts="_localTask.Contexts" />
-
-                    <button type="submit" style="display: none;"></button>
-                </form>
+                @* 풀스크린 모드일 때는 Description 컴포넌트만 렌더링 *@
+                <TaskDetail_Description @bind-Value="_localTask.Description"
+                                        OnCtrlEnter="HandleSave"
+                                        OnFullscreenToggle="HandleFullscreenToggle" />
             }
             else
             {
-                <p>Loading...</p>
-            }
-        </div>
+                @* 일반 모드일 때는 기존 모달 UI 전체를 렌더링 *@
+                <div class="modal-header">
+                    <h3>Edit Task Details</h3>
+                    <button class="close-btn" @onclick="HandleClose">×</button>
+                </div>
 
-        <div class="modal-footer">
-            <button class="btn btn-secondary" @onclick="HandleClose">Cancel</button>
-            <button class="btn btn-primary" @onclick="HandleSave">Save Changes</button>
-        </div>
+                <div class="modal-body">
+                    <form @onsubmit="HandleSave" @onsubmit:preventDefault="true">
+                        <TaskDetail_Title @bind-Value="_localTask.Title" OnEnter="HandleSave" />
+                        <TaskDetail_Description @bind-Value="_localTask.Description"
+                                                OnCtrlEnter="HandleSave"
+                                                OnFullscreenToggle="HandleFullscreenToggle" />
+                        <TaskDetail_Priority @bind-Value="_localTask.Priority" />
+                        <TaskDetail_Dates @bind-StartDate="_localTask.StartDate" @bind-DueDate="_localTask.DueDate" />
+                        <TaskDetail_Contexts @bind-SelectedContexts="_localTask.Contexts" />
+                        <button type="submit" style="display: none;"></button>
+                    </form>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="HandleClose">Cancel</button>
+                    <button class="btn btn-primary" @onclick="HandleSave">Save Changes</button>
+                </div>
+            }
+        }
+        else
+        {
+            <p>Loading...</p>
+        }
     </div>
 </div>
 
 @code {
-    [Parameter, EditorRequired]
-    public TaskItem TaskToEdit { get; set; } = default!;
+    [Parameter, EditorRequired] public TaskItem TaskToEdit { get; set; } = default!;
+    [Parameter] public EventCallback<TaskItem> OnSave { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
 
-    [Parameter]
-    public EventCallback<TaskItem> OnSave { get; set; }
-
-    [Parameter]
-    public EventCallback OnClose { get; set; }
+    // 🚀 새로 추가: 초기 풀스크린 상태를 받는 파라미터
+    [Parameter] public bool StartInFullscreen { get; set; } = false;
 
     private TaskItem? _localTask;
+    private bool _isDescriptionFullscreen = false;
+    private double _touchStartX = 0;
+    private double _touchStartY = 0;
+    private bool _touchStartedOnBackdrop = false;
+
+    // 🚀 최종 수정: 자식(Description) 컴포넌트로부터 풀스크린 상태를 받는 핸들러
+    private void HandleFullscreenToggle(bool isFullscreen)
+    {
+        _isDescriptionFullscreen = isFullscreen;
+        StateHasChanged();
+    }
 
     protected override void OnParametersSet()
     {
+        // 🚀 핵심 수정: 초기 풀스크린 상태 설정
+        _isDescriptionFullscreen = StartInFullscreen;
+
         _localTask = new TaskItem
         {
             Id = TaskToEdit.Id,
@@ -88,40 +107,63 @@
     {
         if (_localTask != null)
         {
-            await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", false);
             await OnSave.InvokeAsync(_localTask);
         }
     }
 
     private async Task HandleClose()
     {
-        await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", false);
         await OnClose.InvokeAsync();
     }
 
-    // 🆕 모바일 터치 이벤트 처리 추가
-    private async Task HandleBackdropTouch(TouchEventArgs e)
+    private void HandleTouchStart(TouchEventArgs e)
     {
-        // 모바일에서 백드롭 터치 시 모달 닫기
-        await HandleClose();
+        if (e.Touches.Length > 0)
+        {
+            _touchStartX = e.Touches[0].ClientX;
+            _touchStartY = e.Touches[0].ClientY;
+            _touchStartedOnBackdrop = true;
+        }
     }
 
-    // 🔧 백드롭 클릭 처리 개선
+    private async Task HandleTouchEnd(TouchEventArgs e)
+    {
+        if (!_touchStartedOnBackdrop || e.ChangedTouches.Length == 0)
+        {
+            _touchStartedOnBackdrop = false;
+            return;
+        }
+
+        var endX = e.ChangedTouches[0].ClientX;
+        var endY = e.ChangedTouches[0].ClientY;
+        var distance = Math.Sqrt(Math.Pow(endX - _touchStartX, 2) + Math.Pow(endY - _touchStartY, 2));
+
+        if (distance < 20)
+        {
+            try
+            {
+                var isMobile = await JSRuntime.InvokeAsync<bool>("eval", "window.innerWidth <= 768");
+                if (isMobile)
+                {
+                    await HandleClose();
+                }
+            }
+            catch { }
+        }
+        _touchStartedOnBackdrop = false;
+    }
+
     private async Task HandleBackdropClick()
     {
         try
         {
-            var isLargeScreen = await JSRuntime.InvokeAsync<bool>("eval", "window.innerWidth >= 768 && window.innerHeight >= 600");
-            if (!isLargeScreen)
+            var isLargeScreen = await JSRuntime.InvokeAsync<bool>("eval", "window.innerWidth > 768");
+            if (isLargeScreen)
             {
                 await HandleClose();
             }
         }
-        catch
-        {
-            // JS 호출 실패 시 기본 동작
-            await HandleClose();
-        }
+        catch { }
     }
 
     public async ValueTask DisposeAsync()
@@ -131,9 +173,5 @@
             await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", false);
         }
         catch (JSDisconnectedException) { }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"모달 해제 중 오류: {ex.Message}");
-        }
     }
 }
