@@ -1,0 +1,32 @@
+﻿@using MyGtdApp.Models
+
+<div class="form-group">
+    <label for="priority">Priority</label>
+    <select id="priority" class="form-select" @bind="CurrentValue">
+        @foreach (var priority in Enum.GetValues<Priority>())
+        {
+            <option value="@priority">@priority</option>
+        }
+    </select>
+</div>
+
+@code {
+    private Priority CurrentValue
+    {
+        get => Value;
+        set
+        {
+            if (Value != value)
+            {
+                Value = value;
+                ValueChanged.InvokeAsync(value);
+            }
+        }
+    }
+
+    [Parameter]
+    public Priority Value { get; set; }
+
+    [Parameter]
+    public EventCallback<Priority> ValueChanged { get; set; }
+}

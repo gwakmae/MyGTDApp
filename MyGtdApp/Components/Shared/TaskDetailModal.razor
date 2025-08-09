@@ -23,6 +23,9 @@
 
                     <TaskDetail_Description @bind-Value="_localTask.Description" OnCtrlEnter="HandleSave" />
 
+                    <!-- 🆕 Priority 설정 추가 -->
+                    <TaskDetail_Priority @bind-Value="_localTask.Priority" />
+
                     <TaskDetail_Dates @bind-StartDate="_localTask.StartDate" @bind-DueDate="_localTask.DueDate" />
 
                     <TaskDetail_Contexts @bind-SelectedContexts="_localTask.Contexts" />
