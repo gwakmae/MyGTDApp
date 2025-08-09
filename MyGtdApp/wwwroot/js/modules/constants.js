@@ -1,10 +1,11 @@
 ﻿// 드래그 앤 드롭 관련 상수 및 전역 변수
 
 // ===== 상수 =====
-export const DRAG_DELAY = 400;
+export const DRAG_DELAY = 600;      // 드래그만 담당
+export const MULTI_TOUCH_SELECTION_DELAY = 800; // 🆕 두 손가락 선택 모드
 export const MOVE_TOLERANCE = 15;
 export const MIN_DRAG_DISTANCE = 25;
-export const MIN_MOVE_AFTER_DRAG = 12;    // 드래그 시작 이후 유효 이동량(px)
+export const MIN_MOVE_AFTER_DRAG = 12;
 
 // ===== 전역 변수 =====
 export let dotNetHelper = null;
@@ -16,20 +17,27 @@ export let startTime = 0;
 
 // 드래그 상태
 export let pressTimer = null;
+export let multiTouchSelectionTimer = null; // 🆕 두 손가락 타이머
+export let isSelectionMode = false;
 export let candidateElement = null;
 export let draggedElement = null;
 export let draggedTaskId = null;
 export let savedDisplay = '';
 export let isDragging = false;
-export let hasMovedEnough = false; // This variable is no longer needed but kept for completeness
+export let hasMovedEnough = false;
 export let lastDropInfo = null;
-export let readyToDrag = false;    // long-press 완료 플래그
-export let movedAfterDrag = false; // drag 시작 후 실제로 움직였는가
+export let readyToDrag = false;
+export let movedAfterDrag = false;
+
+// 🆕 두 손가락 터치 상태
+export let isMultiTouch = false;
+export let multiTouchStartTime = 0;
+export let multiTouchElement = null;
 
 // 드래그 시작 좌표
 export let dragStartX = 0;
 export let dragStartY = 0;
-export let lastTouchEvent = null; // To store the last touch event for beginDrag()
+export let lastTouchEvent = null;
 
 // ===== Setter 함수들 =====
 export function setDotNetHelper(helper) {
@@ -44,6 +52,14 @@ export function setStartPosition(x, y, time) {
 
 export function setPressTimer(timer) {
     pressTimer = timer;
+}
+
+export function setMultiTouchSelectionTimer(timer) { // 🆕
+    multiTouchSelectionTimer = timer;
+}
+
+export function setIsSelectionMode(mode) {
+    isSelectionMode = mode;
 }
 
 export function setCandidateElement(element) {
@@ -91,6 +107,24 @@ export function setLastTouchEvent(event) {
     lastTouchEvent = event;
 }
 
+// 🆕 두 손가락 터치 setter들
+export function setIsMultiTouch(isMulti) {
+    isMultiTouch = isMulti;
+}
+
+export function setMultiTouchStartTime(time) {
+    multiTouchStartTime = time;
+}
+
+export function setMultiTouchElement(element) {
+    multiTouchElement = element;
+}
+
+// wwwroot/js/modules/constants.js에 추가
+export function isValidForSelectionMode() {
+    return isMultiTouch && multiTouchElement !== null;
+}
+
 // ===== 상태 초기화 =====
 export function resetDragState() {
     candidateElement = null;
@@ -103,4 +137,9 @@ export function resetDragState() {
     readyToDrag = false;
     movedAfterDrag = false;
     lastTouchEvent = null;
+    isSelectionMode = false;
+    // 🆕 두 손가락 터치 상태 초기화
+    isMultiTouch = false;
+    multiTouchStartTime = 0;
+    multiTouchElement = null;
 }

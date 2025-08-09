@@ -18,10 +18,10 @@
     border-color: #b3d4ff; /* 테두리 색상도 변경 */
 }
 
-/* 🆕 추가: 선택된 상태에서 호버 시에도 스타일 유지 */
-.task-node-self.is-selected:hover {
-    background-color: #dbeaff;
-}
+    /* 🆕 추가: 선택된 상태에서 호버 시에도 스타일 유지 */
+    .task-node-self.is-selected:hover {
+        background-color: #dbeaff;
+    }
 
 .task-card-content {
     background-color: var(--card-background);
@@ -32,11 +32,13 @@
     align-items: center;
     padding: var(--spacing-sm);
     transition: background-color var(--transition-fast);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(59, 130, 246, 0.1);
 }
 
-.task-card-content:hover {
-    background-color: var(--background-color);
-}
+    .task-card-content:hover {
+        background-color: var(--background-color);
+    }
 
 .task-node-self {
     display: flex;
@@ -47,11 +49,64 @@
     border-bottom: 3px solid transparent;
     margin: -3px 0;
     cursor: pointer; /* 🆕 추가: 클릭 가능함을 암시 */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(59, 130, 246, 0.1);
+    user-select: none;
 }
 
-.task-node-self.drop-inside {
-    background: rgba(59,130,246,.15); /* 유지 */
-    border-color: var(--primary-600); /* 동일 색조 */
+    /* 🆕 추가: 클릭 가능한 아이템 피드백 */
+    .task-node-self.clickable-item:hover {
+        background-color: rgba(59, 130, 246, 0.05);
+        cursor: pointer;
+    }
+
+    .task-node-self.clickable-item:active {
+        background-color: rgba(59, 130, 246, 0.1);
+        transform: scale(0.99);
+    }
+
+    /* 🆕 추가: 선택된 아이템 강조 */
+    .task-node-self.is-selected {
+        background-color: #e9f2ff;
+        border-color: #b3d4ff;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+
+        /* 🆕 추가: 선택된 상태에서 호버 시에도 스타일 유지 */
+        .task-node-self.is-selected:hover {
+            background-color: #dbeaff;
+        }
+
+    .task-node-self.drop-inside {
+        background: rgba(59,130,246,.15); /* 유지 */
+        border-color: var(--primary-600); /* 동일 색조 */
+    }
+
+    /* 선택 모드 시각적 피드백 추가 */
+    .task-node-self.selection-mode {
+        background-color: #e3f2fd;
+        border: 2px dashed #2196f3;
+        animation: selection-pulse 1s ease-in-out;
+        transform: scale(1.02);
+    }
+
+@keyframes selection-pulse {
+    0%, 100% {
+        opacity: 1;
+        border-color: #2196f3;
+    }
+
+    50% {
+        opacity: 0.8;
+        border-color: #1976d2;
+    }
+}
+
+/* 드래그 준비 상태 피드백 */
+.task-node-self.drag-ready {
+    transform: scale(1.01);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    background-color: #f3e5f5;
 }
 
 .task-card-wrapper {
@@ -111,9 +166,9 @@
     transition: background-color var(--transition-fast);
 }
 
-.add-task-btn:hover {
-    background-color: rgba(9,30,66,.08);
-}
+    .add-task-btn:hover {
+        background-color: rgba(9,30,66,.08);
+    }
 
 /* --- Task States (Checkbox, Completed, DueDate) --- */
 .task-checkbox {
@@ -142,11 +197,11 @@
     margin-top: var(--spacing-sm);
 }
 
-.quick-add-container.child-add {
-    padding-left: 24px;
-    margin-top: 4px;
-    margin-bottom: 4px;
-}
+    .quick-add-container.child-add {
+        padding-left: 24px;
+        margin-top: 4px;
+        margin-bottom: 4px;
+    }
 
 /* --- Tree alignment tweaks --- */
 .expander,
@@ -161,3 +216,153 @@
     font-size: 0.9rem;
     line-height: 1;
 }
+
+/* ----- [수정코드 추가 시작] ----- */
+
+/* 홈 컨테이너 */
+.home-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 🆕 모바일 다중 선택 모드 개선 */
+.mobile-multiselect-indicator {
+    display: none;
+    background: var(--primary-color);
+    color: white;
+    padding: 0.75rem 1rem;
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    border-bottom: 2px solid var(--primary-600);
+    position: sticky;
+    top: 0;
+    z-index: 99;
+}
+
+@media (max-width: 1199px) {
+    .mobile-multiselect-indicator {
+        display: flex;
+    }
+}
+
+/* 선택 모드일 때 태스크 카드 스타일 개선 */
+.task-node-self.is-selected {
+    background-color: #e9f2ff;
+    border-color: #b3d4ff;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    position: relative;
+}
+
+    .task-node-self.is-selected::after {
+        content: '✓';
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        width: 20px;
+        height: 20px;
+        background: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        font-weight: bold;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+/* 모바일에서 다중 선택 모드일 때 태스크 선택 가능 표시 */
+@media (max-width: 1199px) {
+    .mobile-multiselect-mode .task-node-self:not(.is-selected) {
+        border: 2px dashed #ccc;
+        background-color: rgba(0,0,0,0.02);
+    }
+
+        .mobile-multiselect-mode .task-node-self:not(.is-selected):hover {
+            border-color: var(--primary-color);
+            background-color: rgba(59, 130, 246, 0.05);
+        }
+}
+
+/* 🆕 모바일에서 선택된 항목 시각적 피드백 강화 */
+@media (max-width: 1199px) {
+    .task-node-self.is-selected::before {
+        content: '✓';
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        width: 22px;
+        height: 22px;
+        background: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        font-weight: bold;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        z-index: 10;
+    }
+}
+
+/* ----- [수정코드 추가 끝] ----- */
+
+/* 🆕 두 손가락 터치 시각적 피드백 */
+.task-node-self.multi-touch-active {
+    background-color: #e8f4f8;
+    border: 2px solid #3b82f6;
+    transform: scale(1.02);
+    transition: all 0.2s ease-out;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+    .task-node-self.multi-touch-active::before {
+        content: '👆👆';
+        position: absolute;
+        top: -30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #3b82f6;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        white-space: nowrap;
+        z-index: 1000;
+        animation: pulse-hint 1s ease-in-out infinite;
+    }
+
+@keyframes pulse-hint {
+    0%, 100% {
+        opacity: 1;
+        transform: translateX(-50%) scale(1);
+    }
+
+    50% {
+        opacity: 0.7;
+        transform: translateX(-50%) scale(1.05);
+    }
+}
+
+/* 두 손가락 모드일 때 드래그 비활성화 표시 */
+.board-container.multi-touch-mode {
+    pointer-events: none;
+}
+
+    .board-container.multi-touch-mode .task-node-self {
+        cursor: not-allowed;
+        opacity: 0.7;
+    }
+
+        .board-container.multi-touch-mode .task-node-self.multi-touch-active {
+            pointer-events: auto;
+            cursor: pointer;
+            opacity: 1;
+        }

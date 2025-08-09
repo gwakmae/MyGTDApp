@@ -14,108 +14,73 @@
 
 <PageTitle>@pageTitle</PageTitle>
 
-@* --- 1. Board View --- *@
-@if (IsBoardView)
-{
-    <div class="main-header modern-header">
-        <div class="header-content">
-            <div class="header-left">
-                <div class="app-logo">
-                    <div class="logo-icon">
-                        <i class="bi bi-kanban"></i>
-                    </div>
-                    <div class="logo-text">
-                        <h1 class="app-title">GTD Board</h1>
-                        <span class="app-subtitle">Getting Things Done</span>
-                    </div>
-                </div>
-            </div>
+@* 기존 코드 최상단에 추가 *@
+<div class="home-container" @onclick="HandleContainerClick" @onclick:stopPropagation="false">
 
-            <div class="header-center">
-                <div class="header-stats">
-                    <div class="stat-item">
-                        <span class="stat-number">@allTopLevelTasks.Count(t => !t.IsCompleted)</span>
-                        <span class="stat-label">Active Tasks</span>
-                    </div>
-                    <div class="stat-divider"></div>
-                    <div class="stat-item">
-                        <span class="stat-number">@todayTasks.Count</span>
-                        <span class="stat-label">Today</span>
-                    </div>
-                    <div class="stat-divider"></div>
-                    <a href="focus" class="stat-item-link">
-                        <div class="stat-item">
-                            <span class="stat-number">@focusTasks.Count</span>
-                            <span class="stat-label">Focus</span>
+    @* --- 1. Board View --- *@
+    @if (IsBoardView)
+    {
+        <div class="main-header modern-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="app-logo">
+                        <div class="logo-icon">
+                            <i class="bi bi-kanban"></i>
                         </div>
-                    </a>
+                        <div class="logo-text">
+                            <h1 class="app-title">GTD Board</h1>
+                            <span class="app-subtitle">Getting Things Done</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="header-center">
+                    <div class="header-stats">
+                        <div class="stat-item">
+                            <span class="stat-number">@allTopLevelTasks.Count(t => !t.IsCompleted)</span>
+                            <span class="stat-label">Active Tasks</span>
+                        </div>
+                        <div class="stat-divider"></div>
+                        <div class="stat-item">
+                            <span class="stat-number">@todayTasks.Count</span>
+                            <span class="stat-label">Today</span>
+                        </div>
+                        <div class="stat-divider"></div>
+                        <a href="focus" class="stat-item-link">
+                            <div class="stat-item">
+                                <span class="stat-number">@focusTasks.Count</span>
+                                <span class="stat-label">Focus</span>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <DataManager class="data-manager board-header" />
+                    <button class="btn btn-modern btn-hide-completed"
+                            title="@(hideCompleted ? "Show completed tasks" : "Hide completed tasks")"
+                            @onclick="ToggleHideCompleted">
+                        <i class="bi @(hideCompleted ? "bi-eye" : "bi-eye-slash")"></i>
+                        <span class="btn-text">@(hideCompleted ? "Show" : "Hide")</span>
+                    </button>
                 </div>
             </div>
-
-            <div class="header-right">
-                <DataManager class="data-manager board-header" />
-                <button class="btn btn-modern btn-hide-completed"
-                        title="@(hideCompleted ? "Show completed tasks" : "Hide completed tasks")"
-                        @onclick="ToggleHideCompleted">
-                    <i class="bi @(hideCompleted ? "bi-eye" : "bi-eye-slash")"></i>
-                    <span class="btn-text">@(hideCompleted ? "Show" : "Hide")</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-
-    <div class="board-container @(draggedTaskId != 0 ? "is-dragging" : "")">
-        <div class="board-column today-column">
-            <h3 class="column-header">Today</h3>
-            <div class="task-list">
-                @foreach (var task in FilterCompleted(todayTasks))
-                {
-                    <ProjectTaskNode @key="task.Id"
-                                     Task="task"
-                                     IsSelected="selectedTaskIds.Contains(task.Id)"
-                                     SelectedTaskIds="selectedTaskIds"
-                                     OnClick="(args) => HandleTaskClick(args.taskId, args.e)"
-                                     HideCompleted="hideCompleted"
-                                     OnTaskAdded="HandleTaskAdded"
-                                     OnTaskDeleted="HandleDeleteTask"
-                                     OnTaskUpdated="HandleUpdateTask"
-                                     OnTaskDragStart="HandleDragStart"
-                                     OnTaskDragEnd="HandleDragEnd"
-                                     OnTaskDropped="args => HandleDropOnProject(args.targetTaskId, args.position)"
-                                     OnTaskCompletedToggle="HandleToggleComplete"
-                                     OnTaskDoubleClick="ShowEditModal"
-                                     DraggedTaskId="draggedTaskId" />
-                }
-            </div>
         </div>
 
-        @foreach (var status in (TaskStatus[])Enum.GetValues(typeof(TaskStatus)))
+        @* 🆕 추가: 다중 선택 모드 표시 (모바일) *@
+        @if (isMultiSelectMode)
         {
-            <div class="board-column @(status == TaskStatus.Projects ? "project-column" : "") @GetColumnDropClass(status)"
-                 @ondrop="() => HandleDropOnColumn(status)"
-                 @ondragover:preventDefault="true"
-                 @ondragover="() => dragOverStatus = status"
-                 @ondragleave="() => dragOverStatus = null">
+            <div class="mobile-multiselect-indicator">
+                <i class="bi bi-check-square"></i>
+                <span>다중 선택 모드 - 더블탭으로 해제</span>
+            </div>
+        }
 
-                @if (status == TaskStatus.Completed)
-                {
-                    <div class="column-header-with-action">
-                        <h3 class="column-header">@status</h3>
-                        <button class="btn-clear-completed"
-                                @onclick="HandleClearCompleted"
-                                title="Clear all completed tasks">
-                            <i class="bi bi-trash3"></i>
-                        </button>
-                    </div>
-                }
-                else
-                {
-                    <h3 class="column-header">@status</h3>
-                }
-
+        <div class="board-container @(draggedTaskId != 0 ? "is-dragging" : "")">
+            <div class="board-column today-column">
+                <h3 class="column-header">Today</h3>
                 <div class="task-list">
-                    @foreach (var task in FilterCompleted(GetTasksForStatus(status)))
+                    @foreach (var task in FilterCompleted(todayTasks))
                     {
                         <ProjectTaskNode @key="task.Id"
                                          Task="task"
@@ -134,94 +99,152 @@
                                          DraggedTaskId="draggedTaskId" />
                     }
                 </div>
-
-                @if (addingTaskStatus == status)
-                {
-                    <div class="quick-add-container">
-                        <input @ref="quickAddInputRef"
-                               @bind="newTaskTitle"
-                               @onkeyup="(e) => HandleQuickAddKeyUp(e, status)"
-                               @onblur="() => HandleQuickAddBlur(status)"
-                               placeholder="Enter a title..."
-                               class="form-control" />
-                    </div>
-                }
-                else
-                {
-                    <button class="add-task-btn" @onclick="() => ShowQuickAdd(status)">+ Add Task</button>
-                }
             </div>
-        }
-    </div>
-}
-@* --- 2. Focus 또는 Context View --- *@
-else
-{
-    <div class="main-header">
-        <h1>@pageTitle</h1>
-        <button class="btn btn-outline-secondary ms-auto ms-xl-3"
-                title="Hide / Show completed tasks"
-                @onclick="ToggleHideCompleted">
-            <i class="bi @(hideCompleted ? "bi-eye-slash" : "bi-eye")"></i>
-            @(hideCompleted ? "Hide Completed" : "Show Completed")
-        </button>
-    </div>
 
-    <div class="list-view-container">
-        @{
-            var tasksToShow = IsFocusView ? focusTasks : contextTasks;
-        }
-        
-        @if (tasksToShow.Any())
-        {
-            @foreach (var task in FilterCompleted(tasksToShow))
+            @foreach (var status in (TaskStatus[])Enum.GetValues(typeof(TaskStatus)))
             {
-                <ProjectTaskNode @key="task.Id"
-                                 Task="task"
-                                 IsSelected="selectedTaskIds.Contains(task.Id)"
-                                 SelectedTaskIds="selectedTaskIds"
-                                 OnClick="(args) => HandleTaskClick(args.taskId, args.e)"
-                                 HideCompleted="hideCompleted"
-                                 OnTaskAdded="HandleTaskAdded"
-                                 OnTaskDeleted="HandleDeleteTask"
-                                 OnTaskUpdated="HandleUpdateTask"
-                                 OnTaskDragStart="HandleDragStart"
-                                 OnTaskDragEnd="HandleDragEnd"
-                                 OnTaskDropped="args => HandleDropOnProject(args.targetTaskId, args.position)"
-                                 OnTaskCompletedToggle="HandleToggleComplete"
-                                 OnTaskDoubleClick="ShowEditModal"
-                                 DraggedTaskId="draggedTaskId" />
+                <div class="board-column @(status == TaskStatus.Projects ? "project-column" : "") @GetColumnDropClass(status)"
+                     @ondrop="() => HandleDropOnColumn(status)"
+                     @ondragover:preventDefault="true"
+                     @ondragover="() => dragOverStatus = status"
+                     @ondragleave="() => dragOverStatus = null">
+
+                    @if (status == TaskStatus.Completed)
+                    {
+                        <div class="column-header-with-action">
+                            <h3 class="column-header">@status</h3>
+                            <button class="btn-clear-completed"
+                                    @onclick="HandleClearCompleted"
+                                    title="Clear all completed tasks">
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <h3 class="column-header">@status</h3>
+                    }
+
+                    <div class="task-list">
+                        @foreach (var task in FilterCompleted(GetTasksForStatus(status)))
+                        {
+                            <ProjectTaskNode @key="task.Id"
+                                             Task="task"
+                                             IsSelected="selectedTaskIds.Contains(task.Id)"
+                                             SelectedTaskIds="selectedTaskIds"
+                                             OnClick="(args) => HandleTaskClick(args.taskId, args.e)"
+                                             HideCompleted="hideCompleted"
+                                             OnTaskAdded="HandleTaskAdded"
+                                             OnTaskDeleted="HandleDeleteTask"
+                                             OnTaskUpdated="HandleUpdateTask"
+                                             OnTaskDragStart="HandleDragStart"
+                                             OnTaskDragEnd="HandleDragEnd"
+                                             OnTaskDropped="args => HandleDropOnProject(args.targetTaskId, args.position)"
+                                             OnTaskCompletedToggle="HandleToggleComplete"
+                                             OnTaskDoubleClick="ShowEditModal"
+                                             DraggedTaskId="draggedTaskId" />
+                        }
+                    </div>
+
+                    @if (addingTaskStatus == status)
+                    {
+                        <div class="quick-add-container">
+                            <input @ref="quickAddInputRef"
+                                   @bind="newTaskTitle"
+                                   @onkeyup="(e) => HandleQuickAddKeyUp(e, status)"
+                                   @onblur="() => HandleQuickAddBlur(status)"
+                                   placeholder="Enter a title..."
+                                   class="form-control" />
+                        </div>
+                    }
+                    else
+                    {
+                        <button class="add-task-btn" @onclick="() => ShowQuickAdd(status)">+ Add Task</button>
+                    }
+                </div>
             }
-        }
-        else
-        {
-            <div class="empty-view-message">
-                <i class="bi bi-inbox"></i>
-                <span>
-                    @(IsFocusView ? "집중할 작업이 없습니다. 멋진 하루 보내세요! ✨" : "이 컨텍스트에 해당하는 작업이 없습니다.")
-                </span>
-            </div>
-        }
-    </div>
+        </div>
+    }
+    @* --- 2. Focus 또는 Context View --- *@
+    else
+    {
+        <div class="main-header">
+            <h1>@pageTitle</h1>
+            <button class="btn btn-outline-secondary ms-auto ms-xl-3"
+                    title="Hide / Show completed tasks"
+                    @onclick="ToggleHideCompleted">
+                <i class="bi @(hideCompleted ? "bi-eye-slash" : "bi-eye")"></i>
+                @(hideCompleted ? "Hide Completed" : "Show Completed")
+            </button>
+        </div>
+
+        <div class="list-view-container">
+            @{
+                var tasksToShow = IsFocusView ? focusTasks : contextTasks;
+            }
+
+            @if (tasksToShow.Any())
+            {
+                @foreach (var task in FilterCompleted(tasksToShow))
+                {
+                    <ProjectTaskNode @key="task.Id"
+                                     Task="task"
+                                     IsSelected="selectedTaskIds.Contains(task.Id)"
+                                     SelectedTaskIds="selectedTaskIds"
+                                     OnClick="(args) => HandleTaskClick(args.taskId, args.e)"
+                                     HideCompleted="hideCompleted"
+                                     OnTaskAdded="HandleTaskAdded"
+                                     OnTaskDeleted="HandleDeleteTask"
+                                     OnTaskUpdated="HandleUpdateTask"
+                                     OnTaskDragStart="HandleDragStart"
+                                     OnTaskDragEnd="HandleDragEnd"
+                                     OnTaskDropped="args => HandleDropOnProject(args.targetTaskId, args.position)"
+                                     OnTaskCompletedToggle="HandleToggleComplete"
+                                     OnTaskDoubleClick="ShowEditModal"
+                                     DraggedTaskId="draggedTaskId" />
+                }
+            }
+            else
+            {
+                <div class="empty-view-message">
+                    <i class="bi bi-inbox"></i>
+                    <span>
+                        @(IsFocusView ? "집중할 작업이 없습니다. 멋진 하루 보내세요! ✨" : "이 컨텍스트에 해당하는 작업이 없습니다.")
+                    </span>
+                </div>
+            }
+        </div>
+    }
+
+
+    @* --- 항상 렌더링되는 모달 및 패널 --- *@
+    @if (taskToEdit != null)
+    {
+        <TaskDetailModal TaskToEdit="taskToEdit"
+                         OnSave="HandleSaveTask"
+                         OnClose="CloseEditModal" />
+    }
+
+    @if (isBulkEditPanelVisible)
+    {
+        <BulkEditPanel SelectedTaskIds="selectedTaskIds"
+                       OnApply="HandleBulkUpdate"
+                       OnClose="CloseBulkEditPanel" />
+    }
+
+    <BulkActionBar SelectedTaskIds="selectedTaskIds"
+                   OnEditClick="OpenBulkEditPanel"
+                   OnDeleteClick="HandleDeleteSelected"
+                   OnDeselectAllClick="DeselectAll" />
+
+    @* 템플릿 마지막에 추가 *@
+</div> @* home-container 닫기 *@
+
+@code {
+    // 🆕 추가: 컨테이너 클릭 처리
+    private void HandleContainerClick(MouseEventArgs e)
+    {
+        // 이벤트가 task 요소에서 발생한 게 아니라면 선택 해제
+        // 실제 구현은 JS에서 더 정확하게 처리
+    }
 }
-
-
-@* --- 항상 렌더링되는 모달 및 패널 --- *@
-@if (taskToEdit != null)
-{
-    <TaskDetailModal TaskToEdit="taskToEdit"
-                     OnSave="HandleSaveTask"
-                     OnClose="CloseEditModal" />
-}
-
-@if(isBulkEditPanelVisible)
-{
-    <BulkEditPanel SelectedTaskIds="selectedTaskIds"
-                   OnApply="HandleBulkUpdate"
-                   OnClose="CloseBulkEditPanel" />
-}
-
-<BulkActionBar SelectedTaskIds="selectedTaskIds"
-               OnEditClick="OpenBulkEditPanel"
-               OnDeleteClick="HandleDeleteSelected"
-               OnDeselectAllClick="DeselectAll" />

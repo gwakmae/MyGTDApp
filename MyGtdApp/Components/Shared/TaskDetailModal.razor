@@ -6,7 +6,7 @@
 
 @implements IAsyncDisposable
 
-<div class="modal-backdrop" @onclick="HandleBackdropClick" @ontouchstart:preventDefault="false">
+<div class="modal-backdrop" @onclick="HandleBackdropClick" @ontouchstart:preventDefault="false" @ontouchend="HandleBackdropTouch">
     <div class="modal-container" @onclick:stopPropagation="true">
 
         <div class="modal-header">
@@ -18,13 +18,13 @@
             @if (_localTask != null)
             {
                 <form @onsubmit="HandleSave" @onsubmit:preventDefault="true">
-                    
+
                     <TaskDetail_Title @bind-Value="_localTask.Title" OnEnter="HandleSave" />
 
                     <TaskDetail_Description @bind-Value="_localTask.Description" OnCtrlEnter="HandleSave" />
 
                     <TaskDetail_Dates @bind-StartDate="_localTask.StartDate" @bind-DueDate="_localTask.DueDate" />
-                    
+
                     <TaskDetail_Contexts @bind-SelectedContexts="_localTask.Contexts" />
 
                     <button type="submit" style="display: none;"></button>
@@ -95,12 +95,28 @@
         await JSRuntime.InvokeVoidAsync("preventBackgroundScroll", false);
         await OnClose.InvokeAsync();
     }
-    
+
+    // 🆕 모바일 터치 이벤트 처리 추가
+    private async Task HandleBackdropTouch(TouchEventArgs e)
+    {
+        // 모바일에서 백드롭 터치 시 모달 닫기
+        await HandleClose();
+    }
+
+    // 🔧 백드롭 클릭 처리 개선
     private async Task HandleBackdropClick()
     {
-        var isLargeScreen = await JSRuntime.InvokeAsync<bool>("eval", "window.innerWidth >= 768 && window.innerHeight >= 600");
-        if (!isLargeScreen)
+        try
         {
+            var isLargeScreen = await JSRuntime.InvokeAsync<bool>("eval", "window.innerWidth >= 768 && window.innerHeight >= 600");
+            if (!isLargeScreen)
+            {
+                await HandleClose();
+            }
+        }
+        catch
+        {
+            // JS 호출 실패 시 기본 동작
             await HandleClose();
         }
     }

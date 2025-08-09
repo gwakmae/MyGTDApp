@@ -17,14 +17,6 @@ public partial class Home
         await TaskService.DeleteTaskAsync(id);
     }
 
-    private void ShowEditModal(int id)
-    {
-        // 🔽 [FIX] Focus 뷰의 Task도 찾을 수 있도록 로직 보강
-        taskToEdit = FindTaskById(allTopLevelTasks, id) ??
-                     FindTaskById(contextTasks, id) ??
-                     FindTaskById(focusTasks, id); // focusTasks에서도 찾기
-    }
-
     private async Task HandleSaveTask(TaskItem updated)
     {
         await TaskService.UpdateTaskAsync(updated);

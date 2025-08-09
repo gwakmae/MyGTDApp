@@ -19,13 +19,11 @@ export function highlightDropTargetUnified(dropInfo) {
 export function applyDragStartEffects(element) {
     if (!element) return;
 
-    // 드래그 시작 애니메이션
     element.style.transition = 'transform 0.2s ease-out';
     element.style.transform = 'scale(1.05)';
     element.style.zIndex = '1000';
     element.classList.add("is-ghost");
 
-    // 잠시 후 transition 제거 (드래그 중에는 부드럽게)
     setTimeout(() => {
         if (element) {
             element.style.transition = '';
@@ -38,10 +36,8 @@ export function updateBoundaryFeedback(element, isInBounds) {
     if (!element) return;
 
     if (isInBounds) {
-        // 경계 안에 있으면 정상 표시
         element.style.opacity = '0.6';
     } else {
-        // 경계 밖으로 나가면 시각적 피드백
         element.style.opacity = '0.3';
     }
 }
@@ -50,19 +46,63 @@ export function updateBoundaryFeedback(element, isInBounds) {
 export function updateDragProgressVisual(element, progress) {
     if (!element) return;
 
-    // progress: 0-1 사이 값
-    const scale = 1 + (progress * 0.05);  // 최대 5% 확대
-    const rotation = progress * 2;         // 최대 2도 회전
+    const scale = 1 + (progress * 0.05);
+    const rotation = progress * 2;
 
     element.style.transform = `scale(${scale}) rotate(${rotation}deg)`;
     element.style.filter = `brightness(${1 + progress * 0.1})`;
 }
 
+// 🆕 두 손가락 터치 시각적 피드백
+export function applyMultiTouchFeedback(element) {
+    if (!element) return;
+
+    element.classList.add('multi-touch-active');
+    element.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.5)';
+    element.style.transform = 'scale(1.02)';
+
+    console.log("[VISUAL] 두 손가락 터치 피드백 적용");
+}
+
+// 🆕 두 손가락 터치 피드백 제거
+export function removeMultiTouchFeedback() {
+    try {
+        document.querySelectorAll('.multi-touch-active')
+            .forEach(el => {
+                el.classList.remove('multi-touch-active');
+                el.style.boxShadow = '';
+                el.style.transform = '';
+            });
+    } catch (error) {
+        console.error("[VISUAL] 두 손가락 피드백 제거 중 오류:", error);
+    }
+}
+
+// 선택 모드 시각적 효과 관리
+export function applySelectionModeEffects(element) {
+    if (!element) return;
+
+    element.classList.add('selection-mode');
+    element.style.transition = 'all 0.3s ease-out';
+}
+
+export function removeSelectionModeEffects() {
+    try {
+        document.querySelectorAll('.selection-mode')
+            .forEach(el => {
+                el.classList.remove('selection-mode');
+                el.style.transition = '';
+            });
+    } catch (error) {
+        console.error("[SELECTION] 선택 모드 효과 제거 중 오류:", error);
+    }
+}
+
 // ===== 모든 시각적 효과 제거 =====
 export function removeAllVisualEffects() {
     try {
-        document.querySelectorAll(".drop-above, .drop-inside, .drop-below, .is-ghost")
-            .forEach(el => el.classList.remove("drop-above", "drop-inside", "drop-below", "is-ghost"));
+        document.querySelectorAll(".drop-above, .drop-inside, .drop-below, .is-ghost, .selection-mode, .drag-ready, .multi-touch-active")
+            .forEach(el => el.classList.remove("drop-above", "drop-inside", "drop-below", "is-ghost", "selection-mode", "drag-ready", "multi-touch-active"));
     } catch (error) {
         console.error("[DRAG] 시각적 효과 제거 중 오류:", error);
     }
@@ -78,4 +118,5 @@ export function restoreElementVisuals(element, savedDisplay) {
     element.style.opacity = '';
     element.style.filter = '';
     element.style.display = savedDisplay;
+    element.style.boxShadow = '';
 }

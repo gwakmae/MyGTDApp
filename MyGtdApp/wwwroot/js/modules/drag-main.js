@@ -1,4 +1,4 @@
-﻿// 메인 드래그 로직 및 이벤트 핸들러들
+﻿// wwwroot/js/modules/drag-main.js
 
 import * as Constants from './constants.js';
 import * as Utils from './utils.js';
@@ -6,12 +6,17 @@ import * as Detection from './drag-detection.js';
 import * as Calculation from './drag-calculation.js';
 import * as Visual from './drag-visual.js';
 
-// ===== 메인 핸들러 =====
+const DOUBLE_TAP_DELAY = 300;
+let tapCount = 0;
+let tapTimer = null;
+let lastTappedElement = null;
+
+// ===== 메인 이벤트 핸들러 =====
 export function handler(e) {
     switch (e.type) {
         case "touchstart": onStart(e); break;
         case "touchmove":
-            Constants.setLastTouchEvent(e); // Store the event for beginDrag
+            Constants.setLastTouchEvent(e);
             onMove(e);
             break;
         case "touchend":
@@ -19,104 +24,134 @@ export function handler(e) {
     }
 }
 
-// ===== 터치 시작 핸들러 =====
+// ===== 🚀 [핵심 수정] 터치 시작 핸들러 (REWRITTEN) =====
 export function onStart(e) {
-    // 드래그 불가능한 요소 체크
-    if (!Detection.isDraggableTarget(e.target)) {
+    // 두 번째 손가락이 화면에 닿아 터치가 2개 이상이 되면,
+    // 즉시 다중 터치 로직으로 전환합니다.
+    if (Detection.isMultiTouchGesture(e)) {
+        console.log("[DRAG] 다중 터치 감지 -> 다중 터치 모드로 전환");
+        // 이전에 시작된 한 손가락 타이머(드래그, 탭)가 있다면 즉시 중단합니다.
+        clearTimeout(Constants.pressTimer);
+        clearTimeout(tapTimer);
+        handleMultiTouchStart(e);
         return;
     }
 
-    const t = e.touches[0];
-    Constants.setStartPosition(t.clientX, t.clientY, Date.now());
-    Constants.setHasMovedEnough(false);
-    Constants.setLastDropInfo(null);
+    // 이하는 새로운 '한 손가락' 터치가 시작되는 경우입니다.
+    if (e.touches.length === 1) {
+        cleanAll(); // 이전 제스처 상태를 깨끗이 정리하고 시작합니다.
 
-    // 핵심 수정: 터치 좌표 기준으로 정확한 요소 찾기
-    const candidateElement = Detection.findTaskElementAtPoint(t.clientX, t.clientY);
+        if (!Detection.isDraggableTarget(e.target)) return;
 
-    if (!candidateElement) {
-        console.log("[DRAG] 유효한 task-node-self 없음");
-        return;
+        const t = e.touches[0];
+        Constants.setStartPosition(t.clientX, t.clientY, Date.now());
+
+        const candidateElement = Detection.findTaskElementAtPoint(t.clientX, t.clientY);
+        if (!candidateElement) return;
+
+        Constants.setCandidateElement(candidateElement);
+        // '한 손가락'으로 할 수 있는 동작(롱프레스->드래그)을 위한 타이머를 시작합니다.
+        startSingleTouchTimers(candidateElement);
     }
+}
 
-    Constants.setCandidateElement(candidateElement);
+// '한 손가락' 제스처 타이머 설정 (롱프레스 -> 드래그 준비)
+function startSingleTouchTimers(element) {
+    if (!element || Constants.isMultiTouch) return; // 다중 터치 상태에서는 실행하지 않습니다.
 
-    console.log("[DRAG] 터치 시작:", {
-        candidateId: candidateElement.dataset.taskId,
-        candidateTitle: candidateElement.querySelector('.task-title')?.textContent?.trim(),
-        touchX: t.clientX,
-        touchY: t.clientY
-    });
-
-    const timer = setTimeout(() => {
-        // 준비 플래그만 세팅, 실제 beginDrag 는 onMove 에서
-        if (Constants.candidateElement) {
+    // 이 타이머는 오직 '드래그 준비' 상태를 만드는 역할만 합니다.
+    const dragTimer = setTimeout(() => {
+        if (Constants.candidateElement && !Constants.isDragging && !Constants.isMultiTouch) {
             Constants.setReadyToDrag(true);
+            console.log("[DRAG] 드래그 준비 완료 (한 손가락 롱프레스).");
+            // ✅ 중요: 여기서 선택 모드를 절대 활성화하지 않습니다.
         }
     }, Constants.DRAG_DELAY);
+    Constants.setPressTimer(dragTimer);
+}
 
-    Constants.setPressTimer(timer);
+// '두 손가락' 제스처 시작 처리
+function handleMultiTouchStart(e) {
+    const commonElement = Detection.findCommonTaskElement(e);
+    if (!commonElement) return;
+
+    // 상태를 '다중 터치' 모드로 전환합니다.
+    Constants.setIsMultiTouch(true);
+    Constants.setMultiTouchStartTime(Date.now());
+    Constants.setMultiTouchElement(commonElement);
+    Constants.setCandidateElement(commonElement);
+
+    console.log("[MULTITOUCH] 다중 터치 대상 확정:", { taskId: commonElement.dataset.taskId });
+    Visual.applyMultiTouchFeedback(commonElement); // '손가락 두 개' 아이콘 표시
+
+    // '두 손가락 롱프레스'를 감지하여 선택 모드를 활성화하는 타이머를 시작합니다.
+    const multiTouchTimer = setTimeout(() => {
+        if (Constants.isMultiTouch && Constants.multiTouchElement) {
+            triggerMultiSelectionMode(Constants.multiTouchElement);
+        }
+    }, Constants.MULTI_TOUCH_SELECTION_DELAY);
+    Constants.setMultiTouchSelectionTimer(multiTouchTimer);
+}
+
+// '다중 선택 모드' 활성화
+function triggerMultiSelectionMode(element) {
+    const taskId = +element.dataset.taskId;
+
+    // 이 함수는 오직 '두 손가락 롱프레스' 경로를 통해서만 호출됩니다.
+    if (Constants.dotNetHelper) {
+        console.log(`[MULTITOUCH] C# EnterSelectionMode 호출 (Task ID: ${taskId})`);
+        Constants.dotNetHelper.invokeMethodAsync("EnterSelectionMode", taskId);
+        Utils.triggerHapticFeedback('heavy');
+        Visual.applySelectionModeEffects(element);
+    } else {
+        console.error("[MULTITOUCH] .NET 참조 객체를 찾을 수 없어 선택 모드를 활성화할 수 없습니다.");
+    }
+
+    cleanupMultiTouchState(); // 제스처가 완료되었으므로 상태를 정리합니다.
+}
+
+// 다중 터치 관련 상태 정리
+function cleanupMultiTouchState() {
+    clearTimeout(Constants.multiTouchSelectionTimer);
+    if (Constants.multiTouchElement) {
+        Visual.removeMultiTouchFeedback(Constants.multiTouchElement);
+    }
+    Constants.setIsMultiTouch(false);
+    Constants.setMultiTouchElement(null);
+    Constants.setMultiTouchStartTime(0);
 }
 
 // ===== 터치 이동 핸들러 =====
 export function onMove(e) {
-    if (!Constants.candidateElement && !Constants.isDragging) return;
-
-    const t = e.touches[0];
-    const dx = t.clientX - Constants.startX;
-    const dy = t.clientY - Constants.startY;
-    const dist = Calculation.calculateDistance(Constants.startX, Constants.startY, t.clientX, t.clientY);
-
-    if (!Constants.isDragging) {
-        // 스크롤 감지
-        if (Detection.isScrollGesture(dx, dy, Constants.MOVE_TOLERANCE)) {
-            console.log("[DRAG] 스크롤 감지 - 드래그 취소");
+    // 다중 터치 모드에서는 드래그를 비활성화합니다.
+    if (Constants.isMultiTouch) {
+        // 손가락 하나라도 떼면 제스처를 취소합니다.
+        if (!Detection.isMultiTouchGesture(e)) {
+            console.log("[MULTITOUCH] 손가락 하나가 떨어져 제스처를 취소합니다.");
             cleanAll();
-            return;
         }
-
-        // long-press 를 끝냈고 이동량이 충분하면 drag 시작
-        if (Detection.shouldStartDrag(Constants.readyToDrag, dist, Constants.MIN_DRAG_DISTANCE)) {
-            beginDrag();
-        }
-        return;    // 아직 drag 모드 아님
-    }
-
-    // 여기부터는 이미 drag 중
-    const currentDx = t.clientX - Constants.dragStartX;
-    const currentDy = t.clientY - Constants.dragStartY;
-    const currentDist = Calculation.calculateDistance(Constants.dragStartX, Constants.dragStartY, t.clientX, t.clientY);
-
-    // 아직 충분히 안 움직였으면 drop 계산도 하지 않음
-    if (!Constants.movedAfterDrag) {
-        if (!Detection.hasMovedEnoughAfterDrag(currentDist, Constants.MIN_MOVE_AFTER_DRAG)) {
-            // placeholder 위치 그대로 유지, 계산 스킵
-            return;
-        }
-        Constants.setMovedAfterDrag(true);    // 한 번 넘으면 이후엔 계속 계산
-    }
-
-    e.preventDefault(); // 실제 드래그 중이고 충분히 이동했을 때만 기본 동작 방지
-
-    // 드래그 경계 확인
-    const isInBounds = Utils.isValidDropZone(t.clientX, t.clientY);
-    Visual.updateBoundaryFeedback(Constants.draggedElement, isInBounds);
-
-    if (!isInBounds) {
         return;
     }
 
-    // 진행률 계산 및 시각화
-    const progress = Calculation.calculateDragProgress(currentDist);
-    if (Constants.draggedElement) {
-        Utils.updateDragProgress(Constants.draggedElement, progress);
+    if (!Constants.candidateElement) return;
+
+    const t = e.touches[0];
+    const dist = Calculation.calculateDistance(Constants.startX, Constants.startY, t.clientX, t.clientY);
+
+    // 드래그가 아직 시작되지 않았을 때
+    if (!Constants.isDragging) {
+        // '드래그 준비' 상태이고 충분히 움직였다면 드래그를 시작합니다.
+        if (Detection.shouldStartDrag(Constants.readyToDrag, dist, Constants.MIN_DRAG_DISTANCE)) {
+            beginDrag();
+        }
+        return;
     }
 
-    // RAF로 업데이트 스케줄링
+    // 드래그가 시작된 후
+    e.preventDefault(); // 화면 스크롤 방지
+    Constants.setMovedAfterDrag(true);
     Utils.scheduleUpdate(() => {
-        const dropInfo = Calculation.calculateUnifiedDropInfo(
-            t.clientX, t.clientY, Constants.draggedElement, Constants.draggedTaskId
-        );
+        const dropInfo = Calculation.calculateUnifiedDropInfo(t.clientX, t.clientY, Constants.draggedElement, Constants.draggedTaskId);
         Constants.setLastDropInfo(dropInfo);
         Visual.highlightDropTargetUnified(dropInfo);
     });
@@ -124,86 +159,99 @@ export function onMove(e) {
 
 // ===== 터치 종료 핸들러 =====
 export function onEnd(e) {
+    // 모든 타이머를 중단합니다.
     clearTimeout(Constants.pressTimer);
+    clearTimeout(Constants.multiTouchSelectionTimer);
+    clearTimeout(tapTimer);
 
-    if (!Constants.isDragging) {
+    // 다중 터치 제스처였다면, 여기서 로직을 종료합니다.
+    if (Constants.isMultiTouch) {
+        console.log("[MULTITOUCH] 두 손가락 터치 종료.");
         cleanAll();
         return;
     }
 
-    const dropInfo = Constants.lastDropInfo;
-
-    console.log("[DRAG] 최종 드롭:", {
-        from: Constants.draggedTaskId,
-        to: dropInfo?.targetId,
-        position: dropInfo?.position
-    });
-
-    if (Calculation.isValidDrop(dropInfo, Constants.draggedTaskId) && Constants.dotNetHelper) {
-        try {
+    // 드래그 중이었다면, 드롭 처리를 합니다.
+    if (Constants.isDragging) {
+        const dropInfo = Constants.lastDropInfo;
+        if (Calculation.isValidDrop(dropInfo, Constants.draggedTaskId) && Constants.dotNetHelper) {
             Constants.dotNetHelper.invokeMethodAsync("HandleDropOnProject", dropInfo.targetId, dropInfo.position);
-            // 성공 시 햅틱 피드백
             Utils.triggerHapticFeedback('success');
-        } catch (error) {
-            console.error("[DRAG] 드롭 실패:", error);
         }
-    } else {
-        console.log("[DRAG] 드롭 취소 - 유효하지 않은 타겟");
-        // 드롭 실패 시 스냅백 애니메이션
-        if (Constants.draggedElement) {
-            Utils.animateSnapBack(Constants.draggedElement, () => {
-                cleanAll();
-            });
-            return; // cleanAll을 애니메이션 완료 후 호출
-        }
+        cleanAll();
+        return;
     }
 
-    cleanAll();
+    // 드래그가 아니었다면, '탭' 또는 '더블탭'으로 간주합니다.
+    const dist = Calculation.calculateDistance(Constants.startX, Constants.startY, e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+    if (dist > Constants.MOVE_TOLERANCE) { // 많이 움직였다면 탭이 아님
+        cleanAll();
+        return;
+    }
+
+    const tappedElement = Constants.candidateElement;
+    if (!tappedElement) {
+        cleanAll();
+        return;
+    }
+
+    // 더블탭 로직
+    tapCount++;
+    if (lastTappedElement !== tappedElement) {
+        tapCount = 1;
+    }
+    lastTappedElement = tappedElement;
+
+    if (tapCount === 1) {
+        tapTimer = setTimeout(() => { cleanAll(); }, DOUBLE_TAP_DELAY);
+    } else if (tapCount === 2) {
+        const taskId = +tappedElement.dataset.taskId;
+        if (taskId && Constants.dotNetHelper) {
+            console.log(`[DRAG-SYSTEM] 더블탭 감지 -> 모달 열기 요청 (Task ID: ${taskId})`);
+            Constants.dotNetHelper.invokeMethodAsync("ShowEditModal", taskId);
+        }
+        cleanAll();
+    }
 }
 
-// ===== 드래그 시작 =====
+// ===== 드래그 시작 처리 =====
 export function beginDrag() {
-    if (!Constants.candidateElement) return;
+    if (!Constants.candidateElement || Constants.isMultiTouch) return;
+
+    clearTimeout(tapTimer);
+    tapCount = 0;
 
     Constants.setIsDragging(true);
     Constants.setDraggedElement(Constants.candidateElement);
     Constants.setDraggedTaskId(+Constants.draggedElement.dataset.taskId);
     Constants.setSavedDisplay(Constants.draggedElement.style.display || '');
 
-    // 드래그 시작 시각적 효과
     Visual.applyDragStartEffects(Constants.draggedElement);
-
-    // 햅틱 피드백 추가
     Utils.triggerHapticFeedback('light');
 
-    console.log("[DRAG] 드래그 시작:", {
-        taskId: Constants.draggedTaskId,
-        title: Constants.draggedElement.querySelector('.task-title')?.textContent?.trim()
-    });
-
-    Constants.setReadyToDrag(false); // Set to false when drag begins
-
-    // dragStartX / dragStartY 저장
-    const t = Constants.lastTouchEvent.touches[0];    // beginDrag() 호출 직전에 onMove 에서 보관
+    Constants.setReadyToDrag(false);
+    const t = Constants.lastTouchEvent.touches[0];
     Constants.setDragStartPosition(t.clientX, t.clientY);
-    Constants.setMovedAfterDrag(false);    // 리셋
 }
 
 // ===== 모든 상태 정리 =====
 export function cleanAll() {
     clearTimeout(Constants.pressTimer);
+    clearTimeout(Constants.multiTouchSelectionTimer);
+    clearTimeout(tapTimer);
 
-    // 원래 상태로 복원
-    Visual.restoreElementVisuals(Constants.draggedElement, Constants.savedDisplay);
+    if (Constants.draggedElement) {
+        Visual.restoreElementVisuals(Constants.draggedElement, Constants.savedDisplay);
+    }
+    if (Constants.multiTouchElement) {
+        Visual.removeMultiTouchFeedback(Constants.multiTouchElement);
+    }
 
-    // 시각적 효과 제거
     Visual.removeAllVisualEffects();
-
-    // 상태 초기화
     Constants.resetDragState();
-
-    // RAF 정리
     Utils.cancelScheduledUpdate();
 
-    console.log("[DRAG] 정리 완료");
+    tapCount = 0;
+    tapTimer = null;
+    lastTappedElement = null;
 }

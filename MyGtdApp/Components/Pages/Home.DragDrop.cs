@@ -16,15 +16,35 @@ public partial class Home
 
     private void HandleDragStart(int id)
     {
-        // 🔄 수정: 드래그 시작 시, 선택된 항목 중 하나가 아니면 선택 목록을 초기화하고 현재 항목만 선택
-        if (!selectedTaskIds.Contains(id))
+        // 항상 물리적으로 드래그되는 아이템의 ID를 설정합니다.
+        draggedTaskId = id;
+
+        // 만약 공식적인 다중 선택 모드가 아니라면 (즉, 한 손가락 롱프레스 드래그)
+        if (!isMultiSelectMode)
         {
-            selectedTaskIds.Clear();
-            selectedTaskIds.Add(id);
-            lastClickedTaskId = id;
-            StateHasChanged(); // UI에 선택 상태 반영
+            // 이전에 선택된 항목이 남아있을 수 있으므로 모두 초기화합니다.
+            if (selectedTaskIds.Any())
+            {
+                selectedTaskIds.Clear();
+                lastClickedTaskId = null;
+                isBulkEditPanelVisible = false;
+                StateHasChanged();
+            }
+            // 핵심: 한 손가락 드래그 시에는 selectedTaskIds에 아무것도 추가하지 않습니다.
         }
-        draggedTaskId = id; // 단일/다중 구분 없이 드래그 주체는 필요
+        else // 다중 선택 모드일 때
+        {
+            // 만약 선택된 그룹의 일부가 아닌 다른 항목을 드래그 시작했다면,
+            // 기존 선택을 모두 해제하고 새로 드래그한 항목만 선택된 것으로 간주합니다.
+            if (!selectedTaskIds.Contains(id))
+            {
+                selectedTaskIds.Clear();
+                selectedTaskIds.Add(id);
+                lastClickedTaskId = id;
+                StateHasChanged();
+            }
+            // 선택된 그룹 내의 항목을 드래그했다면, 선택 상태를 그대로 유지합니다.
+        }
     }
 
     private async Task HandleDragEnd()
@@ -42,7 +62,7 @@ public partial class Home
         if (draggedTaskId == 0) return;
 
         var siblings = GetTasksForStatus(targetStatus);
-        
+
         // 🔄 수정: 다중/단일 이동 분기 처리
         if (selectedTaskIds.Any())
         {
@@ -52,7 +72,7 @@ public partial class Home
         {
             await TaskService.MoveTaskAsync(draggedTaskId, targetStatus, null, siblings.Count);
         }
-        
+
         draggedTaskId = 0;
     }
 
@@ -62,11 +82,11 @@ public partial class Home
 
         // 🔄 수정: 다중 선택 시 자기 자신이나 자손에게 드롭하는 것 방지
         if (selectedTaskIds.Contains(targetTaskId)) return;
-        
+
         var targetTask = FindTaskById(allTopLevelTasks, targetTaskId) ??
                          FindTaskById(contextTasks, targetTaskId);
         if (targetTask == null) return;
-        
+
         // 🆕 추가: 다중 선택 시 순환 참조 방지 강화
         if (selectedTaskIds.Any())
         {
@@ -90,7 +110,7 @@ public partial class Home
             ProjectTaskNode.DropIndicator.Below => (targetTask.ParentId, targetTask.SortOrder + 1),
             _ => (null, 0)
         };
-        
+
         // 🔄 수정: 다중/단일 이동 분기 처리
         if (selectedTaskIds.Any())
         {
@@ -98,7 +118,7 @@ public partial class Home
         }
         else
         {
-             if (draggedTaskId == targetTaskId) return; // 단일 이동 시 자기 자신에게 드롭 방지
+            if (draggedTaskId == targetTaskId) return; // 단일 이동 시 자기 자신에게 드롭 방지
             await TaskService.MoveTaskAsync(draggedTaskId, targetTask.Status, parentId, sortOrder);
         }
 
@@ -120,7 +140,7 @@ public partial class Home
     private List<int> GetAllDescendantIds(TaskItem parent)
     {
         var ids = new List<int>();
-        foreach(var child in parent.Children)
+        foreach (var child in parent.Children)
         {
             ids.Add(child.Id);
             ids.AddRange(GetAllDescendantIds(child));

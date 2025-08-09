@@ -1,17 +1,24 @@
 ﻿@using MyGtdApp.Models
 @using Microsoft.AspNetCore.Components.Web
 
-@* [수정됨] 오류가 발생하지 않도록 클래스 속성과 더블클릭 이벤트를 올바르게 정의합니다. *@
+@* 🔧 더블클릭 및 터치 이벤트 완전 개선 *@
 <div class="task-card-content @(Task.IsCompleted ? "is-completed" : "") @DueDateClass"
-     @ondblclick="() => OnTaskDoubleClick.InvokeAsync(Task.Id)">
+     @ondblclick="HandleDoubleClick"
+     @ondblclick:preventDefault="true"
+     @ondblclick:stopPropagation="true">
 
     <i class="bi @(Task.IsCompleted ? "bi-check-square" : "bi-square") task-checkbox"
-       @onclick="() => OnTaskCompletedToggle.InvokeAsync(Task.Id)"></i>
+       @onclick="HandleCheckboxClick"
+       @onclick:stopPropagation="true"></i>
 
     <span class="task-title">@Task.Title</span>
 
-    @* 삭제 버튼 클릭 시 부모 요소의 이벤트(ondblclick)가 함께 실행되는 것을 막기 위해 stopPropagation을 추가합니다. *@
-    <button class="action-btn simple-delete" @onclick:stopPropagation="true" @onclick="() => OnTaskDeleted.InvokeAsync(Task.Id)" title="Delete Task">×</button>
+    <button class="action-btn simple-delete"
+            @onclick="HandleDeleteClick"
+            @onclick:stopPropagation="true"
+            title="Delete Task">
+        ×
+    </button>
 </div>
 
 @code {
@@ -32,20 +39,29 @@
     {
         get
         {
-            if (Task.IsCompleted || !Task.DueDate.HasValue)
-            {
-                return "";
-            }
+            if (Task.IsCompleted || !Task.DueDate.HasValue) return "";
+
             var today = DateTime.Today;
-            if (Task.DueDate.Value.Date < today)
-            {
-                return "is-overdue"; // 마감일 지남
-            }
-            if (Task.DueDate.Value.Date == today)
-            {
-                return "is-due-today"; // 마감일 오늘
-            }
+            if (Task.DueDate.Value.Date < today) return "is-overdue";
+            if (Task.DueDate.Value.Date == today) return "is-due-today";
             return "";
         }
+    }
+
+    // 🆕 데스크탑 더블클릭 핸들러
+    private Task HandleDoubleClick()
+    {
+        Console.WriteLine($"[TASKCARD] 더블클릭 감지: Task {Task.Id}");
+        return OnTaskDoubleClick.InvokeAsync(Task.Id);
+    }
+
+    private Task HandleCheckboxClick()
+    {
+        return OnTaskCompletedToggle.InvokeAsync(Task.Id);
+    }
+
+    private Task HandleDeleteClick()
+    {
+        return OnTaskDeleted.InvokeAsync(Task.Id);
     }
 }

@@ -5,10 +5,11 @@
 
 <div class="task-node @(DraggedTaskId == Task.Id ? "is-ghost" : "")">
 
-    <div class="task-node-self @DropIndicatorClass @InvalidClass @(IsSelected ? "is-selected" : "")"
+    <div class="task-node-self @DropIndicatorClass @InvalidClass @(IsSelected ? "is-selected" : "") @(GetClickFeedbackClass())"
          draggable="true"
          data-task-id="@Task.Id"
          @onclick="HandleClick"
+         @onclick:stopPropagation="false"
          @ondragstart="() => OnTaskDragStart.InvokeAsync(Task.Id)"
          @ondragend="() => OnTaskDragEnd.InvokeAsync()"
          @ondrop:stopPropagation="true" @ondrop="HandleDrop"
@@ -39,8 +40,8 @@
             <div class="task-separator"></div>
 
             @foreach (var child in Task.Children
-                                       .Where(c => !HideCompleted || !c.IsCompleted)
-                                       .OrderBy(c => c.SortOrder))
+                    .Where(c => !HideCompleted || !c.IsCompleted)
+                    .OrderBy(c => c.SortOrder))
             {
                 <ProjectTaskNode @key="child.Id"
                                  Task="child"
@@ -113,9 +114,20 @@
     };
     private string InvalidClass => dropInvalid ? "drop-invalid" : "";
 
+    // 🆕 클릭 피드백 클래스 개선
+    private string GetClickFeedbackClass()
+    {
+        if (IsSelected) return "is-selected";
+        return "clickable-item";
+    }
+
     /*------------- 이벤트 핸들러 -------------*/
+    // 🔧 클릭 핸들러 개선 - 이벤트 전파 허용
     private async Task HandleClick(MouseEventArgs e)
     {
+        Console.WriteLine($"[PROJECTTASKNODE] 클릭 이벤트: Task {Task.Id}, Detail: {e.Detail}");
+
+        // 🎯 핵심: 이벤트를 상위로 전달하여 Home.HandleTaskClick이 호출되도록 함
         await OnClick.InvokeAsync((Task.Id, e));
     }
 
@@ -138,15 +150,15 @@
         if (isAddingChild)
         {
             await System.Threading.Tasks.Task.Delay(50);
-            try 
-            { 
-                if (quickAddInputRefForChild.Context != null) 
+            try
+            {
+                if (quickAddInputRefForChild.Context != null)
                 {
-                    await quickAddInputRefForChild.FocusAsync(); 
+                    await quickAddInputRefForChild.FocusAsync();
                 }
             }
-            catch (InvalidOperationException) 
-            { 
+            catch (InvalidOperationException)
+            {
                 // 렌더링 과정에서 포커스 설정이 실패하는 예외는 무시합니다.
             }
         }
