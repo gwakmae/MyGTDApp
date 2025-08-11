@@ -1,21 +1,136 @@
-/* 일반 모드 스타일 */
+/* ==========================================================================
+   TaskDetail_Description.razor.css
+   - 리팩토링: 가독성, 재사용성, 유지보수성 향상을 위해 구조 변경 및 중복 제거
+   - Blazor Scoped CSS 제약으로 인해 단일 파일로 재구성
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. 지역 변수 (Local Variables)
+   - 이 컴포넌트 내에서 일관성을 유지하기 위한 변수들
+   -------------------------------------------------------------------------- */
+:host {
+    --border-color-default: #d1d5db;
+    --border-color-focus: #3b82f6;
+    --border-radius-large: 0.75rem;
+    --header-footer-background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    --transition-duration: 0.3s;
+}
+
+/* ==========================================================================
+   2. 레이아웃 (Layout & Containers)
+   - 컴포넌트의 기본 구조와 전체화면 모드 컨테이너 스타일
+   ========================================================================== */
+
+/* 전체화면 모드 컨테이너 */
+.fullscreen-modal {
+    position: fixed;
+    top: 5%;
+    left: 5%;
+    right: 5%;
+    bottom: 5%;
+    background-color: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    animation: modal-slide-in var(--transition-duration) ease-out;
+}
+
+/* 전체화면 모드 배경 */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 9998;
+}
+
+/* ==========================================================================
+   3. 공유 컴포넌트 스타일 (Shared Component Styles)
+   - 헤더, 푸터, 텍스트 영역 등 여러 곳에서 재사용되는 요소의 기본 스타일
+   ========================================================================== */
+
+/* --- 공통 헤더 --- */
+.description-header,
+.fullscreen-modal .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* --- 공통 푸터 --- */
+.description-footer,
+.fullscreen-modal .modal-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* --- 공통 텍스트 영역 --- */
+.description-textarea,
+.modal-textarea {
+    width: 100%;
+    border: 2px solid var(--border-color-default);
+    border-radius: var(--border-radius-large);
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    resize: none;
+    transition: all var(--transition-duration) ease;
+    background: linear-gradient(to bottom, #ffffff, #f9fafb);
+}
+
+    .description-textarea:focus,
+    .modal-textarea:focus {
+        outline: none;
+        border-color: var(--border-color-focus);
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        background: #ffffff;
+    }
+
+/* --- 공통 버튼 (전체화면 모드) --- */
+.modal-btn {
+    padding: 0.875rem 1.5rem;
+    border-radius: 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 2px solid transparent;
+    min-width: 120px;
+    justify-content: center;
+}
+
+    .modal-btn:hover {
+        transform: translateY(-2px);
+    }
+
+    .modal-btn:active {
+        transform: translateY(0);
+    }
+
+/* ==========================================================================
+   4. 모드별 상세 스타일 (Mode-Specific & Unique Styles)
+   -------------------------------------------------------------------------- */
+
+/* --- 일반 모드 (Normal Mode) --- */
 .description-group {
     margin-bottom: 1.5rem;
 }
 
 .description-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.75rem;
     padding-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
     border-bottom: 2px solid #e5e7eb;
 }
 
 .description-label {
     font-weight: 700;
     color: #1f2937;
-    margin: 0;
     font-size: 1rem;
     display: flex;
     align-items: center;
@@ -23,7 +138,7 @@
 }
 
     .description-label i {
-        color: #3b82f6;
+        color: var(--border-color-focus);
         font-size: 1.1rem;
     }
 
@@ -34,18 +149,11 @@
     padding: 0.5rem 1rem;
     border-radius: 0.5rem;
     font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
     box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+    cursor: pointer;
 }
 
     .btn-expand:hover {
-        background: linear-gradient(135deg, #2563eb, #1e40af);
-        transform: translateY(-1px);
         box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
     }
 
@@ -55,45 +163,24 @@
 }
 
 .description-textarea {
-    width: 100%;
-    border: 2px solid #d1d5db;
-    border-radius: 0.75rem;
     padding: 1rem;
-    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 0.95rem;
     line-height: 1.6;
-    resize: vertical;
-    transition: all 0.3s ease;
-    background: linear-gradient(to bottom, #ffffff, #f9fafb);
     min-height: 100px;
+    resize: vertical;
 }
-
-    .description-textarea:focus {
-        outline: none;
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
-        background: #ffffff;
-    }
-
-    .description-textarea.has-content {
-        background: #ffffff;
-        border-color: #10b981;
-    }
 
 .textarea-overlay {
     position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    inset: 0;
     background: rgba(59, 130, 246, 0.05);
-    border-radius: 0.75rem;
+    border-radius: var(--border-radius-large);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     opacity: 0;
-    transition: all 0.3s ease;
+    transition: all var(--transition-duration) ease;
     backdrop-filter: blur(1px);
 }
 
@@ -109,15 +196,9 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .description-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     padding: 0.75rem 0;
     border-top: 1px solid #f3f4f6;
 }
@@ -131,71 +212,36 @@
 }
 
     .quick-tips i {
-        color: #3b82f6;
+        color: var(--border-color-focus);
     }
 
-.char-count {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #6b7280;
-}
-
-    .char-count.warning {
-        color: #f59e0b;
-    }
-
-    .char-count.danger {
-        color: #ef4444;
-    }
-
-/* 풀스크린 모달 - 단순화된 구조 */
-.modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 9998;
-}
-
-.fullscreen-modal {
-    position: fixed;
-    top: 5%;
-    left: 5%;
-    right: 5%;
-    bottom: 5%;
-    background: #ffffff;
-    border-radius: 1rem;
-    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    animation: modalSlideIn 0.3s ease;
-}
-
-@keyframes modalSlideIn {
-    from {
-        opacity: 0;
-        transform: scale(0.95) translateY(-20px);
-    }
-
-    to {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-    }
-}
-
-/* 모달 헤더 */
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+/* --- 전체화면 모드 (Fullscreen Mode) --- */
+.fullscreen-modal .modal-header {
     padding: 1.5rem 2rem;
+    background: var(--header-footer-background);
     border-bottom: 2px solid #e5e7eb;
-    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
     border-radius: 1rem 1rem 0 0;
 }
+
+.fullscreen-modal .modal-body {
+    flex: 1;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-textarea {
+    height: 100%;
+    padding: 2rem;
+    font-size: 1.1rem;
+    line-height: 1.7;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+    .modal-textarea::placeholder {
+        color: #9ca3af;
+        line-height: 1.8;
+    }
 
 .modal-title {
     margin: 0;
@@ -208,7 +254,7 @@
 }
 
     .modal-title i {
-        color: #3b82f6;
+        color: var(--border-color-focus);
     }
 
 .close-btn {
@@ -217,65 +263,20 @@
     padding: 0.75rem;
     border-radius: 0.5rem;
     color: #dc2626;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     width: 44px;
     height: 44px;
-    font-size: 1.1rem;
+    cursor: pointer;
 }
 
     .close-btn:hover {
         background: #fecaca;
-        border-color: #f87171;
         transform: scale(1.05);
     }
 
-/* 모달 본문 */
-.modal-body {
-    flex: 1;
-    padding: 2rem;
-    display: flex;
-    flex-direction: column;
-    background: linear-gradient(to bottom, #ffffff, #f9fafb);
-}
-
-.modal-textarea {
-    width: 100%;
-    height: 100%;
-    border: 2px solid #e2e8f0;
-    border-radius: 0.75rem;
-    padding: 2rem;
-    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 1.1rem;
-    line-height: 1.7;
-    resize: none;
-    background: #ffffff;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-    .modal-textarea:focus {
-        outline: none;
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
-    }
-
-    .modal-textarea::placeholder {
-        color: #9ca3af;
-        line-height: 1.8;
-    }
-
-/* 모달 푸터 */
-.modal-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.fullscreen-modal .modal-footer {
     padding: 1.5rem 2rem;
+    background: var(--header-footer-background);
     border-top: 2px solid #e5e7eb;
-    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
     border-radius: 0 0 1rem 1rem;
 }
 
@@ -285,18 +286,7 @@
     gap: 2rem;
 }
 
-.char-counter {
-    display: flex;
-    align-items: baseline;
-    gap: 0.25rem;
-}
-
-.char-count {
-    font-size: 1.125rem;
-    font-weight: 700;
-}
-
-.char-max {
+.char-counter .char-max {
     font-size: 0.875rem;
     color: #64748b;
 }
@@ -318,21 +308,6 @@
     gap: 1rem;
 }
 
-.modal-btn {
-    padding: 0.875rem 1.5rem;
-    border-radius: 0.75rem;
-    font-size: 0.95rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    border: 2px solid transparent;
-    min-width: 120px;
-    justify-content: center;
-}
-
 .cancel-btn {
     background: #ffffff;
     color: #64748b;
@@ -341,9 +316,7 @@
 
     .cancel-btn:hover {
         background: #f8fafc;
-        color: #475569;
         border-color: #cbd5e1;
-        transform: translateY(-1px);
     }
 
 .save-btn {
@@ -354,17 +327,38 @@
 }
 
     .save-btn:hover {
-        background: linear-gradient(135deg, #059669, #047857);
-        border-color: #059669;
-        transform: translateY(-2px);
         box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
     }
 
-.modal-btn:active {
-    transform: translateY(0);
+/* ==========================================================================
+   5. 상태 및 애니메이션 (States & Animations)
+   -------------------------------------------------------------------------- */
+
+/* 글자 수 카운터 상태 */
+.char-count.warning, .char-counter.warning {
+    color: #f59e0b;
 }
 
-/* 모바일 반응형 */
+.char-count.danger, .char-counter.danger {
+    color: #ef4444;
+}
+
+/* 전체화면 등장 애니메이션 */
+@keyframes modal-slide-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* ==========================================================================
+   6. 반응형 스타일 (Responsive Styles)
+   -------------------------------------------------------------------------- */
 @media (max-width: 768px) {
     .fullscreen-modal {
         top: 2%;
@@ -373,25 +367,22 @@
         bottom: 2%;
     }
 
-    .modal-header {
-        padding: 1rem 1.5rem;
-    }
+        .fullscreen-modal .modal-header,
+        .fullscreen-modal .modal-body,
+        .fullscreen-modal .modal-footer {
+            padding: 1rem 1.5rem;
+        }
 
     .modal-title {
         font-size: 1.25rem;
     }
 
-    .modal-body {
-        padding: 1.5rem;
-    }
-
     .modal-textarea {
-        padding: 1.5rem;
-        font-size: 16px; /* iOS 줌 방지 */
+        font-size: 16px;
     }
+    /* iOS 줌 방지 */
 
-    .modal-footer {
-        padding: 1rem 1.5rem;
+    .fullscreen-modal .modal-footer {
         flex-direction: column;
         gap: 1rem;
     }
@@ -412,7 +403,6 @@
     }
 }
 
-/* 전체화면에서 모바일 */
 @media (max-width: 480px) {
     .fullscreen-modal {
         top: 0;
@@ -422,11 +412,8 @@
         border-radius: 0;
     }
 
-    .modal-header {
-        border-radius: 0;
-    }
-
-    .modal-footer {
-        border-radius: 0;
-    }
+        .fullscreen-modal .modal-header,
+        .fullscreen-modal .modal-footer {
+            border-radius: 0;
+        }
 }
