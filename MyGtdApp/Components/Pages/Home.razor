@@ -14,7 +14,6 @@
 
 <PageTitle>@pageTitle</PageTitle>
 
-@* 기존 코드 최상단에 추가 *@
 <div class="home-container" @onclick="HandleContainerClick" @onclick:stopPropagation="false">
 
     @* --- 1. Board View --- *@
@@ -63,6 +62,12 @@
                         <i class="bi @(hideCompleted ? "bi-eye" : "bi-eye-slash")"></i>
                         <span class="btn-text">@(hideCompleted ? "Show" : "Hide")</span>
                     </button>
+                    <button class="btn btn-modern btn-toggle-hidden @(showHidden ? "active" : "")"
+                            title="@(showHidden ? "Hide hidden tasks" : "Show hidden tasks")"
+                            @onclick="ToggleShowHidden">
+                        <i class="bi @(showHidden ? "bi-eye-fill" : "bi-eye-slash-fill")"></i>
+                        <span class="btn-text">Hidden</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -80,7 +85,7 @@
             <div class="board-column today-column">
                 <h3 class="column-header">Today</h3>
                 <div class="task-list">
-                    @foreach (var task in FilterCompleted(todayTasks))
+                    @foreach (var task in FilterTasks(todayTasks))
                     {
                         <ProjectTaskNode @key="task.Id"
                                          Task="task"
@@ -88,6 +93,7 @@
                                          SelectedTaskIds="selectedTaskIds"
                                          OnClick="(args) => HandleTaskClick(args.taskId, args.e)"
                                          HideCompleted="hideCompleted"
+                                         ShowHidden="showHidden"
                                          OnTaskAdded="HandleTaskAdded"
                                          OnTaskDeleted="HandleDeleteTask"
                                          OnTaskUpdated="HandleUpdateTask"
@@ -126,7 +132,7 @@
                     }
 
                     <div class="task-list">
-                        @foreach (var task in FilterCompleted(GetTasksForStatus(status)))
+                        @foreach (var task in FilterTasks(GetTasksForStatus(status)))
                         {
                             <ProjectTaskNode @key="task.Id"
                                              Task="task"
@@ -134,6 +140,7 @@
                                              SelectedTaskIds="selectedTaskIds"
                                              OnClick="(args) => HandleTaskClick(args.taskId, args.e)"
                                              HideCompleted="hideCompleted"
+                                             ShowHidden="showHidden"
                                              OnTaskAdded="HandleTaskAdded"
                                              OnTaskDeleted="HandleDeleteTask"
                                              OnTaskUpdated="HandleUpdateTask"
@@ -170,12 +177,20 @@
     {
         <div class="main-header">
             <h1>@pageTitle</h1>
-            <button class="btn btn-outline-secondary ms-auto ms-xl-3"
-                    title="Hide / Show completed tasks"
-                    @onclick="ToggleHideCompleted">
-                <i class="bi @(hideCompleted ? "bi-eye-slash" : "bi-eye")"></i>
-                @(hideCompleted ? "Hide Completed" : "Show Completed")
-            </button>
+            <div class="ms-auto d-flex gap-2">
+                <button class="btn btn-outline-secondary"
+                        title="Hide / Show completed tasks"
+                        @onclick="ToggleHideCompleted">
+                    <i class="bi @(hideCompleted ? "bi-eye" : "bi-eye-slash")"></i>
+                    @(hideCompleted ? "Show" : "Hide") Completed
+                </button>
+                <button class="btn btn-outline-secondary @(showHidden ? "active" : "")"
+                        title="@(showHidden ? "Hide hidden tasks" : "Show hidden tasks")"
+                        @onclick="ToggleShowHidden">
+                    <i class="bi @(showHidden ? "bi-eye-fill" : "bi-eye-slash-fill")"></i>
+                    @(showHidden ? "Showing Hidden" : "Show Hidden")
+                </button>
+            </div>
         </div>
 
         <div class="list-view-container">
@@ -185,7 +200,7 @@
 
             @if (tasksToShow.Any())
             {
-                @foreach (var task in FilterCompleted(tasksToShow))
+                @foreach (var task in FilterTasks(tasksToShow))
                 {
                     <ProjectTaskNode @key="task.Id"
                                      Task="task"
@@ -193,6 +208,7 @@
                                      SelectedTaskIds="selectedTaskIds"
                                      OnClick="(args) => HandleTaskClick(args.taskId, args.e)"
                                      HideCompleted="hideCompleted"
+                                     ShowHidden="showHidden"
                                      OnTaskAdded="HandleTaskAdded"
                                      OnTaskDeleted="HandleDeleteTask"
                                      OnTaskUpdated="HandleUpdateTask"
@@ -237,14 +253,11 @@
                    OnDeleteClick="HandleDeleteSelected"
                    OnDeselectAllClick="DeselectAll" />
 
-    @* 템플릿 마지막에 추가 *@
-</div> @* home-container 닫기 *@
+</div>
 
 @code {
-    // 🆕 추가: 컨테이너 클릭 처리
     private void HandleContainerClick(MouseEventArgs e)
     {
-        // 이벤트가 task 요소에서 발생한 게 아니라면 선택 해제
-        // 실제 구현은 JS에서 더 정확하게 처리
+        // JS에서 더 정확하게 처리
     }
 }

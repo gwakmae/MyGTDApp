@@ -31,7 +31,6 @@ namespace MyGtdApp.Components.Pages
         private List<TaskItem> renderedTasks = new();
 
         /* ──────────────── UI 상태 ----------------------- */
-        private bool hideCompleted = false;
         private TaskStatus? addingTaskStatus = null;
         private string newTaskTitle = "";
         private ElementReference quickAddInputRef;
@@ -66,7 +65,10 @@ namespace MyGtdApp.Components.Pages
             {
                 var helper = DotNetObjectReference.Create<object>(this);
                 await BoardJs.SetupAsync(helper);
-                await LoadHideCompletedState();
+
+                // UIState.cs에 정의된 메서드 호출
+                // await LoadHideCompletedState(); <-- 삭제
+                // await LoadShowHiddenState(); <-- 삭제
 
                 // 🆕 추가: 키보드 이벤트 등록
                 await JSRuntime.InvokeVoidAsync("setupKeyboardHandlers", DotNetObjectReference.Create(this));
@@ -113,6 +115,10 @@ namespace MyGtdApp.Components.Pages
                 tasksToFlatten = boardOrderedTasks;
             }
 
+            // ✨ [수정] 통합 필터 메서드 호출로 변경
+            // var filteredTasks = FilterTasks(tasksToFlatten); <-- 삭제
+            var filteredTasks = tasksToFlatten;
+
             void Flatten(IEnumerable<TaskItem> tasks)
             {
                 foreach (var task in tasks)
@@ -125,7 +131,9 @@ namespace MyGtdApp.Components.Pages
                 }
             }
 
-            Flatten(tasksToFlatten);
+            // ✨ [수정] 필터링된 목록을 Flatten 함수에 전달
+            // Flatten(filteredTasks); <-- 삭제
+            Flatten(filteredTasks);
         }
 
         private async void HandleTaskServiceChange()
@@ -215,7 +223,7 @@ namespace MyGtdApp.Components.Pages
             }
         }
 
-        // 🆕 추가: 빈 공간 클릭 처리  
+        // 🆕 추가: 빈 공간 클릭 처리 
         [JSInvokable]
         public void HandleBackgroundClick()
         {
@@ -331,5 +339,9 @@ namespace MyGtdApp.Components.Pages
                 Console.WriteLine($"[MODAL] Task {taskId}를 찾을 수 없음");
             }
         }
+
+        // ===============================================
+        // ✨ UI 상태 관리 관련 필드, 메서드, 헬퍼를 모두 제거
+        // ===============================================
     }
 }

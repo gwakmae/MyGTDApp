@@ -36,6 +36,14 @@
                         <TaskDetail_Priority @bind-Value="_localTask.Priority" />
                         <TaskDetail_Dates @bind-StartDate="_localTask.StartDate" @bind-DueDate="_localTask.DueDate" />
                         <TaskDetail_Contexts @bind-SelectedContexts="_localTask.Contexts" />
+
+                        @* ✨ 추가: 숨김 설정 체크박스 *@
+                        <div class="form-group form-check mt-4">
+                            <input type="checkbox" class="form-check-input" id="isHiddenCheck" @bind="_localTask.IsHidden" />
+                            <label class="form-check-label" for="isHiddenCheck">Hide task and all sub-tasks</label>
+                            <small class="form-text text-muted d-block">Hides the task from all views unless "Show Hidden" is enabled.</small>
+                        </div>
+
                         <button type="submit" style="display: none;"></button>
                     </form>
                 </div>
@@ -89,6 +97,7 @@
             ParentId = TaskToEdit.ParentId,
             SortOrder = TaskToEdit.SortOrder,
             IsCompleted = TaskToEdit.IsCompleted,
+            IsHidden = TaskToEdit.IsHidden, // ✨ 수정: IsHidden 속성 복사
             StartDate = TaskToEdit.StartDate,
             DueDate = TaskToEdit.DueDate,
             Contexts = new List<string>(TaskToEdit.Contexts ?? new List<string>())

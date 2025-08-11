@@ -41,6 +41,7 @@
 
             @foreach (var child in Task.Children
                     .Where(c => !HideCompleted || !c.IsCompleted)
+                    .Where(c => ShowHidden || !c.IsHidden)
                     .OrderBy(c => c.SortOrder))
             {
                 <ProjectTaskNode @key="child.Id"
@@ -57,7 +58,8 @@
                                  OnTaskCompletedToggle="OnTaskCompletedToggle"
                                  OnTaskDoubleClick="OnTaskDoubleClick"
                                  DraggedTaskId="DraggedTaskId"
-                                 HideCompleted="HideCompleted" />
+                                 HideCompleted="HideCompleted"
+                                 ShowHidden="ShowHidden" />
             }
 
             @if (isAddingChild)
@@ -83,6 +85,7 @@
     [Parameter, EditorRequired] public TaskItem Task { get; set; } = default!;
     [Parameter] public int DraggedTaskId { get; set; }
     [Parameter] public bool HideCompleted { get; set; }
+    [Parameter] public bool ShowHidden { get; set; }
 
     [Parameter] public bool IsSelected { get; set; }
     [Parameter] public List<int> SelectedTaskIds { get; set; } = new();

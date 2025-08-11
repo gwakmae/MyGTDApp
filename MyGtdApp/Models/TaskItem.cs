@@ -17,7 +17,7 @@ namespace MyGtdApp.Models
         public string Title { get; set; } = string.Empty;
 
         /// <summary>작업에 대한 상세 설명</summary>
-        public string Description { get; set; } = string.Empty;  // ← 새로 추가
+        public string Description { get; set; } = string.Empty;
 
         public Priority Priority { get; set; }
 
@@ -26,13 +26,13 @@ namespace MyGtdApp.Models
         /* ──────────────────────────────
          * 트리 구조(부모-자식 관계)
          * ────────────────────────────── */
-        public int? ParentId { get; set; }                   // 최상위면 null
+        public int? ParentId { get; set; }
 
-        [NotMapped]                                          // DB 매핑 제외 ← 변경된 부분
+        [NotMapped]
         public List<TaskItem> Children { get; set; } = new();
 
-        public string Path { get; set; } = string.Empty;   // "4/102/201"
-        public int Depth { get; set; }                  // 루트=0, 자식=1 …
+        public string Path { get; set; } = string.Empty;
+        public int Depth { get; set; }
 
         /* ──────────────────────────────
          * 정렬용
@@ -62,6 +62,11 @@ namespace MyGtdApp.Models
 
         /// <summary>트리 뷰 확장/축소 상태</summary>
         public bool IsExpanded { get; set; } = true;
+
+        /// <summary>
+        /// 작업 및 모든 하위 작업을 숨길지 여부
+        /// </summary>
+        public bool IsHidden { get; set; } = false;
     }
 
     /* ──────────────────────────────
