@@ -57,6 +57,11 @@ namespace MyGtdApp.Components.Pages
         protected override async Task OnInitializedAsync()
         {
             NavManager.LocationChanged += HandleLocationChanged;
+
+            // 🆕 이 두 줄만 추가하세요
+            await LoadHideCompletedState();
+            await LoadShowHiddenState();
+
             await RefreshDataBasedOnRoute();
             TaskService.OnChange += HandleTaskServiceChange;
         }
