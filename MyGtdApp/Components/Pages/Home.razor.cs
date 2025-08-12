@@ -138,9 +138,18 @@ namespace MyGtdApp.Components.Pages
             Flatten(filteredTasks);
         }
 
-        private async void HandleTaskServiceChange()
+        private async void HandleTaskServiceChange() // Task를 다시 void로 변경
         {
-            await InvokeAsync(RefreshDataBasedOnRoute);
+            try
+            {
+                await InvokeAsync(RefreshDataBasedOnRoute);
+            }
+            catch (Exception ex)
+            {
+                // 오류가 발생해도 프로그램을 멈추지 않고,
+                // 개발자만 볼 수 있게 로그를 남깁니다.
+                Console.WriteLine($"Error during task service change: {ex.Message}");
+            }
         }
 
         private void HandleTaskClick(int taskId, MouseEventArgs e)
@@ -275,9 +284,16 @@ namespace MyGtdApp.Components.Pages
             StateHasChanged();
         }
 
-        private async void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+        private async void HandleLocationChanged(object? sender, LocationChangedEventArgs e) // Task를 다시 void로 변경
         {
-            await InvokeAsync(RefreshDataBasedOnRoute);
+            try
+            {
+                await InvokeAsync(RefreshDataBasedOnRoute);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error during location change: {ex.Message}");
+            }
         }
 
         public ValueTask DisposeAsync()
