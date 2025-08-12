@@ -333,21 +333,48 @@ namespace MyGtdApp.Components.Pages
         /// </summary>
         private int GetActiveLeafTasksCount()
         {
-            var allTasks = new List<TaskItem>();
+            // '숨김 보이기'가 켜져 있으면, 숨김 상태를 고려할 필요가 전혀 없습니다.
+            // 이 경우, 모든 미완료 리프 노드를 단순히 계산하는 것이 가장 빠릅니다.
+            if (showHidden)
+            {
+                var allTasks = new List<TaskItem>();
+                CollectAllTasks(allTopLevelTasks, allTasks);
+                return allTasks.Count(t => !t.IsCompleted && !t.Children.Any());
+            }
 
-            // 모든 태스크를 평면화하여 수집
-            CollectAllTasks(allTopLevelTasks, allTasks);
+            // 계층 구조를 재귀적으로 탐색하며 '보이는' 활성 리프 노드만 카운트하는 함수
+            int CountVisibleLeafTasks(IEnumerable<TaskItem> tasks, bool isParentHidden)
+            {
+                int count = 0;
+                foreach (var task in tasks)
+                {
+                    // 이 태스크가 실질적으로 숨겨졌는지 판단합니다.
+                    // 부모가 숨겨졌거나, 혹은 자기 자신이 숨겨진 경우입니다.
+                    bool isEffectivelyHidden = isParentHidden || task.IsHidden;
 
-            // 완료되지 않고 자식이 없는 태스크만 카운트
-            // + showHidden이 false일 때는 숨겨진 태스크 제외
-            return allTasks.Count(t => !t.IsCompleted &&
-                                      !t.Children.Any() &&
-                                      (showHidden || !t.IsHidden));
+                    // 조건 확인:
+                    // 1. 실질적으로 숨겨지지 않았고,
+                    // 2. 완료되지 않았으며,
+                    // 3. 자식이 없는 리프 노드일 때
+                    if (!isEffectivelyHidden && !task.IsCompleted && !task.Children.Any())
+                    {
+                        count++;
+                    }
+
+                    // 자식 노드가 있다면, 현재 태스크의 '실질적 숨김' 상태를 전달하며 재귀 호출
+                    if (task.Children.Any())
+                    {
+                        count += CountVisibleLeafTasks(task.Children, isEffectivelyHidden);
+                    }
+                }
+                return count;
+            }
+
+            // 최상위 태스크부터 재귀 카운트를 시작합니다. (최상위의 부모는 숨겨져 있지 않으므로 false)
+            return CountVisibleLeafTasks(allTopLevelTasks, false);
         }
 
-        /// <summary>
-        /// 계층 구조의 모든 태스크를 평면 리스트로 수집합니다.
-        /// </summary>
+        // 참고: 기존 CollectAllTasks 메서드는 다른 곳에서 사용될 수 있으므로 그대로 둡니다.
         private void CollectAllTasks(IEnumerable<TaskItem> tasks, List<TaskItem> result)
         {
             foreach (var task in tasks)
