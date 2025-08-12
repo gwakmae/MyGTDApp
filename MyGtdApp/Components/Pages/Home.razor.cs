@@ -326,5 +326,38 @@ namespace MyGtdApp.Components.Pages
                 Console.WriteLine($"[MODAL] Task {taskId}를 찾을 수 없음");
             }
         }
+
+        /// <summary>
+        /// 자식이 없는 미완료 태스크(리프 노드)의 개수를 계산합니다.
+        /// 부모 태스크는 카운트하지 않고, 실제 실행 가능한 액션만 계산합니다.
+        /// </summary>
+        private int GetActiveLeafTasksCount()
+        {
+            var allTasks = new List<TaskItem>();
+
+            // 모든 태스크를 평면화하여 수집
+            CollectAllTasks(allTopLevelTasks, allTasks);
+
+            // 완료되지 않고 자식이 없는 태스크만 카운트
+            // + showHidden이 false일 때는 숨겨진 태스크 제외
+            return allTasks.Count(t => !t.IsCompleted &&
+                                      !t.Children.Any() &&
+                                      (showHidden || !t.IsHidden));
+        }
+
+        /// <summary>
+        /// 계층 구조의 모든 태스크를 평면 리스트로 수집합니다.
+        /// </summary>
+        private void CollectAllTasks(IEnumerable<TaskItem> tasks, List<TaskItem> result)
+        {
+            foreach (var task in tasks)
+            {
+                result.Add(task);
+                if (task.Children.Any())
+                {
+                    CollectAllTasks(task.Children, result);
+                }
+            }
+        }
     }
 }
