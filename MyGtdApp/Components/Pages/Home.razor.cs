@@ -58,10 +58,6 @@ namespace MyGtdApp.Components.Pages
         {
             NavManager.LocationChanged += HandleLocationChanged;
 
-            // 🆕 이 두 줄만 추가하세요
-            await LoadHideCompletedState();
-            await LoadShowHiddenState();
-
             await RefreshDataBasedOnRoute();
             TaskService.OnChange += HandleTaskServiceChange;
         }
@@ -69,7 +65,11 @@ namespace MyGtdApp.Components.Pages
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (firstRender)
-            {
+            {              
+                await LoadHideCompletedState();
+                await LoadShowHiddenState();
+                StateHasChanged(); // 설정을 불러왔으니 화면을 한번 더 갱신하라고 알려줍니다.                                   
+
                 var dotNetHelper = DotNetObjectReference.Create<object>(this);
                 await BoardJs.SetupAsync(dotNetHelper);
                 await JSRuntime.InvokeVoidAsync("setupKeyboardHandlers", dotNetHelper);
