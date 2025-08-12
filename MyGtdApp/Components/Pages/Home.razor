@@ -72,7 +72,6 @@
             </div>
         </div>
 
-        @* 🆕 추가: 다중 선택 모드 표시 (모바일) *@
         @if (isMultiSelectMode)
         {
             <div class="mobile-multiselect-indicator">
@@ -81,7 +80,7 @@
             </div>
         }
 
-        <div class="board-container @(draggedTaskId != 0 ? "is-dragging" : "")">
+        <div @ref="boardContainerElement" class="board-container @(draggedTaskId != 0 ? "is-dragging" : "")">
             <div class="board-column today-column">
                 <h3 class="column-header">Today</h3>
                 <div class="task-list">
@@ -109,7 +108,7 @@
 
             @foreach (var status in (TaskStatus[])Enum.GetValues(typeof(TaskStatus)))
             {
-                <div class="board-column @(status == TaskStatus.Projects ? "project-column" : "") @GetColumnDropClass(status)"
+                <div class="board-column @(status == TaskStatus.NextActions || status == TaskStatus.Projects ? "resizable" : "") @(status == TaskStatus.Projects ? "project-column" : "") @GetColumnDropClass(status)"
                      @ondrop="() => HandleDropOnColumn(status)"
                      @ondragover:preventDefault="true"
                      @ondragover="() => dragOverStatus = status"
@@ -172,7 +171,6 @@
             }
         </div>
     }
-    @* --- 2. Focus 또는 Context View --- *@
     else
     {
         <div class="main-header">
@@ -232,8 +230,6 @@
         </div>
     }
 
-
-    @* --- 항상 렌더링되는 모달 및 패널 --- *@
     @if (taskToEdit != null)
     {
         <TaskDetailModal TaskToEdit="taskToEdit"

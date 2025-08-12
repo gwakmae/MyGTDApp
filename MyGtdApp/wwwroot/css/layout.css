@@ -105,3 +105,35 @@
     flex: 1;
     overflow-y: auto;
 }
+
+/* ===== 컬럼 리사이즈 기능 CSS 추가 ===== */
+@media (min-width: 1200px) {
+    .board-column.resizable {
+        position: relative;
+    }
+
+    .column-resizer {
+        position: absolute;
+        right: -4px;
+        top: 0;
+        bottom: 0;
+        width: 8px;
+        cursor: col-resize;
+        z-index: 10;
+        /* 미니멀 스타일 */
+        background-color: rgba(156, 163, 175, 0.2);
+        border-radius: 2px;
+        transition: background-color 0.15s ease;
+    }
+
+        .column-resizer:hover {
+            background-color: rgba(59, 130, 246, 0.4);
+        }
+
+    /* 🔧 드래그 중일 때 더 명확한 피드백 */
+    body.is-resizing .column-resizer {
+        background-color: rgba(59, 130, 246, 0.5);
+        box-shadow: 0 0 12px rgba(59, 130, 246, 0.8);
+        border-right-color: rgba(59, 130, 246, 0.8);
+    }
+}

@@ -49,7 +49,9 @@ namespace MyGtdApp.Components.Pages
         private bool IsFocusView => NavManager.Uri.EndsWith("/focus", StringComparison.OrdinalIgnoreCase);
         private bool IsContextView => !string.IsNullOrEmpty(Context);
 
-        private bool isMultiSelectMode = false; // 🆕 추가: 다중 선택 모드
+        private bool isMultiSelectMode = false;
+
+        private ElementReference boardContainerElement;
 
         /* ──────────────── 생명주기 ---------------------- */
         protected override async Task OnInitializedAsync()
@@ -59,19 +61,18 @@ namespace MyGtdApp.Components.Pages
             TaskService.OnChange += HandleTaskServiceChange;
         }
 
-        protected override async Task OnAfterRenderAsync(bool first)
+        protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            if (first)
+            if (firstRender)
             {
-                var helper = DotNetObjectReference.Create<object>(this);
-                await BoardJs.SetupAsync(helper);
+                var dotNetHelper = DotNetObjectReference.Create<object>(this);
+                await BoardJs.SetupAsync(dotNetHelper);
+                await JSRuntime.InvokeVoidAsync("setupKeyboardHandlers", dotNetHelper);
+            }
 
-                // UIState.cs에 정의된 메서드 호출
-                // await LoadHideCompletedState(); <-- 삭제
-                // await LoadShowHiddenState(); <-- 삭제
-
-                // 🆕 추가: 키보드 이벤트 등록
-                await JSRuntime.InvokeVoidAsync("setupKeyboardHandlers", DotNetObjectReference.Create(this));
+            if (IsBoardView && boardContainerElement.Context != null)
+            {
+                await JSRuntime.InvokeVoidAsync("initializeColumnResizers", boardContainerElement);
             }
         }
 
@@ -115,8 +116,6 @@ namespace MyGtdApp.Components.Pages
                 tasksToFlatten = boardOrderedTasks;
             }
 
-            // ✨ [수정] 통합 필터 메서드 호출로 변경
-            // var filteredTasks = FilterTasks(tasksToFlatten); <-- 삭제
             var filteredTasks = tasksToFlatten;
 
             void Flatten(IEnumerable<TaskItem> tasks)
@@ -131,8 +130,6 @@ namespace MyGtdApp.Components.Pages
                 }
             }
 
-            // ✨ [수정] 필터링된 목록을 Flatten 함수에 전달
-            // Flatten(filteredTasks); <-- 삭제
             Flatten(filteredTasks);
         }
 
@@ -141,20 +138,16 @@ namespace MyGtdApp.Components.Pages
             await InvokeAsync(RefreshDataBasedOnRoute);
         }
 
-        // ───── 🚀 [핵심 수정] HandleTaskClick 메서드 전체를 이 코드로 교체하세요 ─────
         private void HandleTaskClick(int taskId, MouseEventArgs e)
         {
-            // 데스크탑 더블클릭은 여기서 처리 (모바일 더블탭은 JS가 처리)
             if (e.Detail == 2)
             {
                 ShowEditModal(taskId);
                 return;
             }
 
-            // === 다중 선택 모드 (모바일/데스크탑 공통) ===
             if (isMultiSelectMode || e.CtrlKey || e.ShiftKey)
             {
-                // Shift 키를 사용한 범위 선택 (데스크탑)
                 if (e.ShiftKey && lastClickedTaskId.HasValue)
                 {
                     var lastIndex = renderedTasks.FindIndex(t => t.Id == lastClickedTaskId.Value);
@@ -174,7 +167,7 @@ namespace MyGtdApp.Components.Pages
                         }
                     }
                 }
-                else // Ctrl 키 또는 모바일 다중 선택 모드에서의 개별 토글
+                else
                 {
                     if (selectedTaskIds.Contains(taskId))
                     {
@@ -186,7 +179,7 @@ namespace MyGtdApp.Components.Pages
                     }
                 }
             }
-            else // === 일반 클릭 (선택되지 않은 항목 클릭) ===
+            else
             {
                 if (selectedTaskIds.Any())
                 {
@@ -199,7 +192,6 @@ namespace MyGtdApp.Components.Pages
             StateHasChanged();
         }
 
-        // 🆕 모바일 디바이스 감지 개선
         private async Task<bool> IsMobileDevice()
         {
             try
@@ -212,7 +204,6 @@ namespace MyGtdApp.Components.Pages
             }
         }
 
-        // 🆕 추가: ESC 키 처리
         [JSInvokable]
         public void HandleEscapeKey()
         {
@@ -223,7 +214,6 @@ namespace MyGtdApp.Components.Pages
             }
         }
 
-        // 🆕 추가: 빈 공간 클릭 처리 
         [JSInvokable]
         public void HandleBackgroundClick()
         {
@@ -234,14 +224,10 @@ namespace MyGtdApp.Components.Pages
             }
         }
 
-        // JSInvokable 메서드 수정
         [JSInvokable]
         public async Task EnterSelectionMode(int taskId)
         {
-            // 🚀 [수정] JavaScript 로직을 신뢰하고 불필요한 JS interop 확인 제거
-
-            // 선택 모드 진입 로직
-            isMultiSelectMode = true; // ✅ 다중 선택 모드 플래그 활성화
+            isMultiSelectMode = true;
 
             if (!selectedTaskIds.Contains(taskId))
             {
@@ -280,7 +266,7 @@ namespace MyGtdApp.Components.Pages
             selectedTaskIds.Clear();
             lastClickedTaskId = null;
             isBulkEditPanelVisible = false;
-            isMultiSelectMode = false; // ✅ 다중 선택 모드 플래그 비활성화 추가
+            isMultiSelectMode = false;
             StateHasChanged();
         }
 
@@ -294,13 +280,11 @@ namespace MyGtdApp.Components.Pages
             TaskService.OnChange -= HandleTaskServiceChange;
             NavManager.LocationChanged -= HandleLocationChanged;
 
-            // 🆕 추가: 키보드 이벤트 정리
             _ = JSRuntime.InvokeVoidAsync("cleanupKeyboardHandlers");
 
             return ValueTask.CompletedTask;
         }
 
-        // ──────────────── [추가] 전체 선택/해제 도우미 메서드 ────────────────
         [JSInvokable]
         public void SelectAllTasks()
         {
@@ -318,13 +302,11 @@ namespace MyGtdApp.Components.Pages
             StateHasChanged();
         }
 
-        // 🆕 JavaScript와 C#에서 모두 호출 가능한 통합 ShowEditModal 메서드
         [JSInvokable]
         public void ShowEditModal(int taskId)
         {
             Console.WriteLine($"[MODAL] 모달 열기 요청: Task {taskId}");
 
-            // 🔽 Focus 뷰의 Task도 찾을 수 있도록 로직 보강
             taskToEdit = FindTaskById(allTopLevelTasks, taskId) ??
                          FindTaskById(contextTasks, taskId) ??
                          FindTaskById(focusTasks, taskId);
@@ -339,9 +321,5 @@ namespace MyGtdApp.Components.Pages
                 Console.WriteLine($"[MODAL] Task {taskId}를 찾을 수 없음");
             }
         }
-
-        // ===============================================
-        // ✨ UI 상태 관리 관련 필드, 메서드, 헬퍼를 모두 제거
-        // ===============================================
     }
 }
