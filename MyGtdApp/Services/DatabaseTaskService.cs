@@ -46,6 +46,7 @@ namespace MyGtdApp.Services
 
         public async Task UpdateTaskAsync(TaskItem taskToUpdate)
         {
+            // 단일 업데이트
             var existingTask = await _repository.GetByIdAsync(taskToUpdate.Id);
             if (existingTask == null) return;
 
@@ -56,6 +57,7 @@ namespace MyGtdApp.Services
 
             if (hiddenStateChanged)
             {
+                // 숨김 상태 변경 시 자손 일괄 적용
                 await CascadeHiddenStateAsync(taskToUpdate.Id, taskToUpdate.IsHidden);
             }
 
@@ -63,6 +65,9 @@ namespace MyGtdApp.Services
             NotifyStateChanged();
         }
 
+        /// <summary>
+        /// (개선) 모든 Raw 로드 1회 + 후속 일괄 업데이트로 N+1 제거
+        /// </summary>
         private async Task CascadeHiddenStateAsync(int parentId, bool isHidden)
         {
             var allTasks = await _repository.GetAllRawAsync();
@@ -75,11 +80,10 @@ namespace MyGtdApp.Services
 
             if (!descendantsToUpdate.Any()) return;
 
-            foreach (var descendant in descendantsToUpdate)
-            {
-                descendant.IsHidden = isHidden;
-                await _repository.UpdateAsync(descendant);
-            }
+            foreach (var d in descendantsToUpdate)
+                d.IsHidden = isHidden;
+
+            await _repository.UpdateRangeAsync(descendantsToUpdate);
         }
 
         public async Task MoveTaskAsync(int taskId, TaskStatus newStatus, int? newParentId, int newSortOrder)
@@ -96,48 +100,58 @@ namespace MyGtdApp.Services
 
         public async Task ToggleCompleteStatusAsync(int taskId)
         {
-            var task = await _repository.GetByIdAsync(taskId);
+            // 1회 Raw 로드
+            var allTasks = await _repository.GetAllRawAsync();
+            var lookup = allTasks.ToLookup(t => t.ParentId);
+            var task = allTasks.FirstOrDefault(t => t.Id == taskId);
             if (task is null) return;
 
-            var completed = !task.IsCompleted;
-            task.IsCompleted = completed;
-            task.Status = completed ? TaskStatus.Completed : (task.OriginalStatus ?? TaskStatus.NextActions);
-            if (completed) task.OriginalStatus = task.Status == TaskStatus.Completed ? task.OriginalStatus : task.Status;
-            else task.OriginalStatus = null;
+            bool completed = !task.IsCompleted;
 
-            await _repository.UpdateAsync(task);
-            await SetChildrenCompletedRecursive(taskId, completed);
-            NotifyStateChanged();
-        }
-
-        private async Task SetChildrenCompletedRecursive(int parentId, bool completed)
-        {
-            var stack = new Stack<int>();
-            stack.Push(parentId);
-
-            while (stack.Count > 0)
+            // 부모(선택한 태스크) 업데이트
+            if (completed)
             {
-                var id = stack.Pop();
-                var children = (await _repository.GetAllRawAsync())
-                                     .Where(c => c.ParentId == id);
+                task.OriginalStatus = task.Status;
+                task.Status = TaskStatus.Completed;
+            }
+            else
+            {
+                task.Status = task.OriginalStatus ?? TaskStatus.NextActions;
+                task.OriginalStatus = null;
+            }
+            task.IsCompleted = completed;
 
-                foreach (var c in children)
+            var toUpdate = new List<TaskItem> { task };
+
+            // 자손 재귀
+            void Visit(int parent)
+            {
+                foreach (var child in lookup[parent])
                 {
-                    c.IsCompleted = completed;
-                    c.Status = completed ? TaskStatus.Completed
-                                         : (c.OriginalStatus ?? TaskStatus.NextActions);
-                    if (!completed) c.OriginalStatus = null;
-
-                    await _repository.UpdateAsync(c);
-                    stack.Push(c.Id);
+                    child.IsCompleted = completed;
+                    if (completed)
+                    {
+                        child.OriginalStatus = child.Status;
+                        child.Status = TaskStatus.Completed;
+                    }
+                    else
+                    {
+                        child.Status = child.OriginalStatus ?? TaskStatus.NextActions;
+                        child.OriginalStatus = null;
+                    }
+                    toUpdate.Add(child);
+                    Visit(child.Id);
                 }
             }
+            Visit(task.Id);
+
+            await _repository.UpdateRangeAsync(toUpdate);
+            NotifyStateChanged();
         }
 
         public async Task<List<TaskItem>> GetTodayTasksAsync() => await _repository.GetTodayTasksAsync();
         public async Task<List<string>> GetAllContextsAsync() => await _repository.GetAllContextsAsync();
         public async Task<List<TaskItem>> GetTasksByContextAsync(string context) => await _repository.GetByContextAsync(context);
-
         public async Task<List<TaskItem>> GetFocusTasksAsync() => await _repository.GetFocusTasksAsync();
 
         public async Task BulkUpdateTasksAsync(BulkUpdateModel updateModel)
@@ -175,11 +189,14 @@ namespace MyGtdApp.Services
         {
             var allTasks = await _repository.GetAllRawAsync();
             var tasksWithContext = allTasks.Where(t => t.Contexts.Contains(context)).ToList();
-            foreach (var task in tasksWithContext)
+            if (!tasksWithContext.Any()) return;
+
+            foreach (var t in tasksWithContext)
             {
-                task.Contexts.Remove(context);
-                await _repository.UpdateAsync(task);
+                t.Contexts.Remove(context);
             }
+
+            await _repository.UpdateRangeAsync(tasksWithContext);
             NotifyStateChanged();
         }
 

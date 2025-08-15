@@ -18,10 +18,10 @@ public interface ITaskRepository
     Task<List<TaskItem>> GetAllRawAsync();
     Task DeleteByStatusRecursiveAsync(TaskStatus status);
 
-    // 🆕 추가: Focus View 용 데이터 조회
     Task<List<TaskItem>> GetFocusTasksAsync();
-
-    // 🆕 추가: 일괄 업데이트
     Task BulkUpdateTasksAsync(BulkUpdateModel model);
     Task DeleteTasksAsync(List<int> taskIds);
+
+    // 🔧 추가: 대량 업데이트 (N+1 제거용)
+    Task UpdateRangeAsync(IEnumerable<TaskItem> tasks);
 }

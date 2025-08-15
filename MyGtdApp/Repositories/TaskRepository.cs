@@ -3,7 +3,7 @@ using MyGtdApp.Models;
 using MyGtdApp.Services;
 using System.Collections.Generic;
 using System.Linq;
-using TaskStatus = MyGtdApp.Models.TaskStatus; // 모호성 해결
+using TaskStatus = MyGtdApp.Models.TaskStatus;
 
 namespace MyGtdApp.Repositories;
 
@@ -26,7 +26,6 @@ public class TaskRepository : ITaskRepository
                                    .ToListAsync();
 
         var lookup = allTasks.ToDictionary(t => t.Id);
-
         foreach (var t in allTasks) t.Children = new();
 
         foreach (var t in allTasks)
@@ -79,9 +78,8 @@ public class TaskRepository : ITaskRepository
         task.SortOrder = maxSortOrder + 1;
 
         context.Tasks.Add(task);
-        await context.SaveChangesAsync();    // Id 확정
+        await context.SaveChangesAsync();
 
-        /* ---------- 여기부터 변경 ---------- */
         string Pad(int n) => n.ToString("D6");
 
         if (task.ParentId == null)
@@ -95,7 +93,6 @@ public class TaskRepository : ITaskRepository
             task.Path = $"{parent!.Path}/{Pad(task.Id)}";
             task.Depth = parent.Depth + 1;
         }
-        /* ----------------------------------- */
 
         await context.SaveChangesAsync();
         return task;
@@ -105,6 +102,13 @@ public class TaskRepository : ITaskRepository
     {
         using var context = _dbContextFactory.CreateDbContext();
         context.Tasks.Update(task);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task UpdateRangeAsync(IEnumerable<TaskItem> tasks)
+    {
+        using var context = _dbContextFactory.CreateDbContext();
+        context.Tasks.UpdateRange(tasks);
         await context.SaveChangesAsync();
     }
 
@@ -157,13 +161,10 @@ public class TaskRepository : ITaskRepository
     public async Task<List<TaskItem>> GetByContextAsync(string context)
     {
         using var contextDb = _dbContextFactory.CreateDbContext();
-
-        // 완료되지 않은 모든 태스크를 가져온 후 클라이언트에서 필터링
         var allTasks = await contextDb.Tasks
             .Where(t => !t.IsCompleted)
             .ToListAsync();
 
-        // 메모리에서 컨텍스트 필터링
         return allTasks
             .Where(t => t.Contexts.Contains(context))
             .OrderBy(t => t.Status)
@@ -183,23 +184,20 @@ public class TaskRepository : ITaskRepository
          .ThenByDescending(t => t.Priority)
          .ToListAsync();
     }
-    
-    // 🆕 추가: Focus View에 표시될 Task를 가져옵니다.
+
     public async Task<List<TaskItem>> GetFocusTasksAsync()
     {
         using var context = _dbContextFactory.CreateDbContext();
-        var today = System.DateTime.Today;
-
+        var today = DateTime.Today;
         return await context.Tasks
             .Where(t => !t.IsCompleted &&
                         (t.Priority == Priority.High || (t.DueDate.HasValue && t.DueDate.Value.Date <= today.AddDays(3))))
-            .OrderBy(t => t.DueDate ?? System.DateTime.MaxValue)
+            .OrderBy(t => t.DueDate ?? DateTime.MaxValue)
             .ThenByDescending(t => t.Priority)
             .AsNoTracking()
             .ToListAsync();
     }
 
-    // 🆕 추가: 여러 Task를 일괄적으로 업데이트합니다.
     public async Task BulkUpdateTasksAsync(BulkUpdateModel model)
     {
         if (model.TaskIds == null || !model.TaskIds.Any())
@@ -212,43 +210,31 @@ public class TaskRepository : ITaskRepository
 
         foreach (var task in tasksToUpdate)
         {
-            if (model.DueDate.HasValue)
-            {
-                task.DueDate = model.DueDate;
-            }
-
-            if (model.Priority.HasValue)
-            {
-                task.Priority = model.Priority.Value;
-            }
+            if (model.DueDate.HasValue) task.DueDate = model.DueDate;
+            if (model.Priority.HasValue) task.Priority = model.Priority.Value;
 
             if (!string.IsNullOrWhiteSpace(model.ContextToAdd))
             {
-                var contextToAdd = model.ContextToAdd.StartsWith("@") ? model.ContextToAdd : $"@{model.ContextToAdd}";
-                if (!task.Contexts.Contains(contextToAdd))
-                {
-                    task.Contexts.Add(contextToAdd);
-                }
+                var c = model.ContextToAdd.StartsWith("@") ? model.ContextToAdd : $"@{model.ContextToAdd}";
+                if (!task.Contexts.Contains(c)) task.Contexts.Add(c);
             }
-
             if (!string.IsNullOrWhiteSpace(model.ContextToRemove))
             {
-                var contextToRemove = model.ContextToRemove.StartsWith("@") ? model.ContextToRemove : $"@{model.ContextToRemove}";
-                task.Contexts.Remove(contextToRemove);
+                var c = model.ContextToRemove.StartsWith("@") ? model.ContextToRemove : $"@{model.ContextToRemove}";
+                task.Contexts.Remove(c);
             }
         }
-        
+
         await context.SaveChangesAsync();
     }
 
-    // 🆕 추가: 일괄 삭제 구현
     public async Task DeleteTasksAsync(List<int> taskIds)
     {
         if (taskIds == null || !taskIds.Any()) return;
 
         using var context = _dbContextFactory.CreateDbContext();
-        var allIdsToDelete = new HashSet<int>();
         var allTasks = await context.Tasks.AsNoTracking().ToListAsync();
+        var allIdsToDelete = new HashSet<int>();
 
         foreach (var id in taskIds)
         {
@@ -257,33 +243,26 @@ public class TaskRepository : ITaskRepository
             {
                 var descendants = allTasks.Where(t => t.Path.StartsWith(task.Path + "/")).Select(t => t.Id);
                 allIdsToDelete.Add(id);
-                foreach (var descId in descendants)
-                {
-                    allIdsToDelete.Add(descId);
-                }
+                foreach (var d in descendants) allIdsToDelete.Add(d);
             }
         }
 
-        var tasksToDelete = await context.Tasks.Where(t => allIdsToDelete.Contains(t.Id)).ToListAsync();
-        if (tasksToDelete.Any())
+        var toDelete = await context.Tasks.Where(t => allIdsToDelete.Contains(t.Id)).ToListAsync();
+        if (toDelete.Any())
         {
-            context.Tasks.RemoveRange(tasksToDelete);
+            context.Tasks.RemoveRange(toDelete);
             await context.SaveChangesAsync();
         }
     }
-    
+
     public async Task<List<string>> GetAllContextsAsync()
     {
         using var context = _dbContextFactory.CreateDbContext();
         var allTasks = await context.Tasks.ToListAsync();
-
-        var allContexts = allTasks
-                                       .SelectMany(t => t.Contexts)
-                                       .Distinct()
-                                       .OrderBy(c => c)
-                                       .ToList();
-
-        return allContexts;
+        return allTasks.SelectMany(t => t.Contexts)
+                       .Distinct()
+                       .OrderBy(c => c)
+                       .ToList();
     }
 
     public async Task UpdateExpandStateAsync(int taskId, bool isExpanded)
