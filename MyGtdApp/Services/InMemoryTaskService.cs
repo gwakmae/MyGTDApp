@@ -6,10 +6,6 @@ using System.Threading.Tasks;
 
 namespace MyGtdApp.Services
 {
-    /// <summary>
-    /// 메모리 기반 작업 관리를 위한 서비스입니다. (리팩토링됨)
-    /// 각 책임을 별도의 헬퍼 클래스에 위임하는 Facade 역할을 수행합니다.
-    /// </summary>
     public class InMemoryTaskService : ITaskService
     {
         public event Action? OnChange;
@@ -51,6 +47,10 @@ namespace MyGtdApp.Services
 
         public Task<List<TaskItem>> GetFocusTasksAsync()
             => Task.FromResult(_queryHelper.GetFocusTasks());
+
+        // ✨ 추가: 인터페이스 구현 오류 해결
+        public Task<List<TaskItem>> GetActiveTasksAsync()
+            => Task.FromResult(_queryHelper.GetActiveTasks());
 
         // --- Manipulation Methods (Write Operations) ---
         public Task<TaskItem> AddTaskAsync(string title, Models.TaskStatus status, int? parentId)

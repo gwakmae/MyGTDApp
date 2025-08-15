@@ -1,4 +1,5 @@
-﻿using MyGtdApp.Models;
+﻿// 파일명: Services/DatabaseTaskService.cs
+using MyGtdApp.Models;
 using MyGtdApp.Repositories;
 using System;
 using System.Collections.Generic;
@@ -28,6 +29,36 @@ namespace MyGtdApp.Services
 
         private void NotifyStateChanged() => OnChange?.Invoke();
 
+        public async Task<List<TaskItem>> GetActiveTasksAsync() // ✨ 추가
+        {
+            var allTasks = await _repository.GetAllRawAsync();
+            var today = DateTime.Today;
+
+            // 자식 관계를 파악하기 위해 모든 작업을 조회하고 메모리에서 필터링
+            var taskLookup = allTasks.ToLookup(t => t.ParentId);
+
+            return allTasks.Where(t =>
+            {
+                // 1. Inbox 상태는 제외
+                if (t.Status == TaskStatus.Inbox) return false;
+
+                // 2. 프로젝트(자식이 있는 작업)는 제외
+                if (taskLookup.Contains(t.Id)) return false;
+
+                // 3. 이미 완료된 작업은 제외
+                if (t.IsCompleted) return false;
+
+                // 4. 시작 날짜가 미래로 지정된 작업은 제외
+                if (t.StartDate.HasValue && t.StartDate.Value.Date > today) return false;
+
+                return true;
+            })
+            .OrderBy(t => t.Status)
+            .ThenBy(t => t.SortOrder)
+            .ToList();
+        }
+
+        // --- 기존 메서드들은 그대로 유지 ---
         public async Task<List<TaskItem>> GetAllTasksAsync() => await _repository.GetAllAsync();
 
         public async Task<TaskItem> AddTaskAsync(string title, TaskStatus status, int? parentId)
@@ -46,7 +77,6 @@ namespace MyGtdApp.Services
 
         public async Task UpdateTaskAsync(TaskItem taskToUpdate)
         {
-            // 단일 업데이트
             var existingTask = await _repository.GetByIdAsync(taskToUpdate.Id);
             if (existingTask == null) return;
 
@@ -57,7 +87,6 @@ namespace MyGtdApp.Services
 
             if (hiddenStateChanged)
             {
-                // 숨김 상태 변경 시 자손 일괄 적용
                 await CascadeHiddenStateAsync(taskToUpdate.Id, taskToUpdate.IsHidden);
             }
 
@@ -65,9 +94,6 @@ namespace MyGtdApp.Services
             NotifyStateChanged();
         }
 
-        /// <summary>
-        /// (개선) 모든 Raw 로드 1회 + 후속 일괄 업데이트로 N+1 제거
-        /// </summary>
         private async Task CascadeHiddenStateAsync(int parentId, bool isHidden)
         {
             var allTasks = await _repository.GetAllRawAsync();
@@ -100,7 +126,6 @@ namespace MyGtdApp.Services
 
         public async Task ToggleCompleteStatusAsync(int taskId)
         {
-            // 1회 Raw 로드
             var allTasks = await _repository.GetAllRawAsync();
             var lookup = allTasks.ToLookup(t => t.ParentId);
             var task = allTasks.FirstOrDefault(t => t.Id == taskId);
@@ -108,7 +133,6 @@ namespace MyGtdApp.Services
 
             bool completed = !task.IsCompleted;
 
-            // 부모(선택한 태스크) 업데이트
             if (completed)
             {
                 task.OriginalStatus = task.Status;
@@ -123,7 +147,6 @@ namespace MyGtdApp.Services
 
             var toUpdate = new List<TaskItem> { task };
 
-            // 자손 재귀
             void Visit(int parent)
             {
                 foreach (var child in lookup[parent])
@@ -198,25 +221,6 @@ namespace MyGtdApp.Services
 
             await _repository.UpdateRangeAsync(tasksWithContext);
             NotifyStateChanged();
-        }
-
-        public async Task AddGlobalContextAsync(string context)
-        {
-            var existingContexts = await GetAllContextsAsync();
-            if (!existingContexts.Contains(context))
-            {
-                var dummyTask = new TaskItem
-                {
-                    Title = "_CONTEXT_HOLDER_",
-                    Status = TaskStatus.Completed,
-                    IsCompleted = true,
-                    Contexts = new List<string> { context }
-                };
-
-                await _repository.AddAsync(dummyTask);
-                NotifyStateChanged();
-                Console.WriteLine($"전역 컨텍스트 '{context}' 추가됨");
-            }
         }
     }
 }

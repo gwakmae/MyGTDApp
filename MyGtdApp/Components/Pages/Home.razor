@@ -1,6 +1,8 @@
 ﻿@page "/"
 @page "/focus"
 @page "/context/{Context}"
+@* ✨ 추가: Active Tasks 뷰를 위한 라우트 *@
+@page "/active"
 @rendermode InteractiveServer
 
 @using MyGtdApp.Models
@@ -193,7 +195,10 @@
 
         <div class="list-view-container">
             @{
-                var tasksToShow = IsFocusView ? focusTasks : contextTasks;
+                var tasksToShow = IsFocusView ? focusTasks
+                : IsContextView ? contextTasks
+                : IsActiveTasksView ? activeTasks
+                : new List<TaskItem>();
             }
 
             @if (tasksToShow.Any())
@@ -223,10 +228,13 @@
                 <div class="empty-view-message">
                     <i class="bi bi-inbox"></i>
                     <span>
-                        @(IsFocusView ? "집중할 작업이 없습니다. 멋진 하루 보내세요! ✨" : "이 컨텍스트에 해당하는 작업이 없습니다.")
-                    </span>
-                </div>
-            }
+                        @(IsFocusView ? "집중할 작업이 없습니다. 멋진 하루 보내세요! ✨"
+                                        : IsContextView ? "이 컨텍스트에 해당하는 작업이 없습니다."
+                                        : IsActiveTasksView ? "활성화된 작업이 없습니다. Inbox를 확인하거나 새 작업을 추가하세요! 👍"
+                                        : "")
+            </span>
+        </div>
+                }
         </div>
     }
 

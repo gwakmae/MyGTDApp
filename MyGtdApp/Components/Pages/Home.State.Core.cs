@@ -27,6 +27,7 @@ public partial class Home
     private List<TaskItem> todayTasks = new();
     private List<TaskItem> contextTasks = new();
     private List<TaskItem> focusTasks = new();
+    private List<TaskItem> activeTasks = new(); // ✨ 추가
 
     // Shift / Ctrl 범위 선택의 "정렬 기준 단일 평면" (중복 제거된 Id 시퀀스)
     private List<TaskItem> renderedTasks = new();
@@ -49,9 +50,11 @@ public partial class Home
     private bool isMultiSelectMode = false;
 
     /* View Helpers */
-    private bool IsBoardView => !IsFocusView && !IsContextView;
+    // ✨ 수정: IsBoardView에 IsActiveTasksView 조건 추가
+    private bool IsBoardView => !IsFocusView && !IsContextView && !IsActiveTasksView;
     private bool IsFocusView => NavManager.Uri.EndsWith("/focus", StringComparison.OrdinalIgnoreCase);
     private bool IsContextView => !string.IsNullOrEmpty(Context);
+    private bool IsActiveTasksView => NavManager.Uri.EndsWith("/active", StringComparison.OrdinalIgnoreCase); // ✨ 추가
 
     private ElementReference boardContainerElement;
 

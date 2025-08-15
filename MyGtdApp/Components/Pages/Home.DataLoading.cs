@@ -1,4 +1,4 @@
-﻿// 파일명: Components/Pages/Home.DataLoading.cs (UPDATED)
+﻿// 파일명: Components/Pages/Home.DataLoading.cs
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,7 +12,9 @@ public partial class Home
 {
     private async Task RefreshDataBasedOnRoute()
     {
+        // ✨ 수정: ActiveTasksAsync 호출을 다른 뷰와 함께 로드하도록 변경
         focusTasks = await TaskService.GetFocusTasksAsync();
+        activeTasks = await TaskService.GetActiveTasksAsync(); // 데이터 미리 로드
 
         if (IsFocusView)
         {
@@ -22,6 +24,11 @@ public partial class Home
         {
             pageTitle = $"Context: @{Context}";
             contextTasks = await TaskService.GetTasksByContextAsync($"@{Context}");
+        }
+        else if (IsActiveTasksView) // ✨ 추가: Active Tasks 뷰 처리
+        {
+            pageTitle = "Active Tasks";
+            // activeTasks는 위에서 이미 로드됨
         }
         else
         {
@@ -34,23 +41,17 @@ public partial class Home
         StateHasChanged();
     }
 
-    /// <summary>
-    /// UI상의 Shift 선택/범위 계산 시 "중복(Task Id 반복)"으로 인한
-    /// 인덱스 혼란을 제거하기 위해 Today / Status 컬럼에 중복으로
-    /// 표시되는 항목을 renderedTasks 평면 목록에서는 1회만 포함한다.
-    /// (시각적 컬럼 중복은 Razor에서 그대로 유지)
-    /// </summary>
     private void BuildRenderedTaskList()
     {
         renderedTasks.Clear();
         IEnumerable<TaskItem> roots;
 
+        // ✨ 수정: IsActiveTasksView 조건 추가
         if (IsFocusView) roots = focusTasks;
         else if (IsContextView) roots = contextTasks;
+        else if (IsActiveTasksView) roots = activeTasks;
         else
         {
-            // Board View: Today + 각 Status 컬럼 순서대로
-            // (표시 순서를 반영하기 위해 리스트 구성)
             var ordered = new List<TaskItem>();
             ordered.AddRange(todayTasks.OrderBy(t => t.SortOrder));
             foreach (var status in (TaskStatus[])Enum.GetValues(typeof(TaskStatus)))
@@ -68,7 +69,6 @@ public partial class Home
             {
                 if (!seen.Add(t.Id))
                 {
-                    // 중복 감지 → selection 인덱스 혼동 방지 위해 skip
                     continue;
                 }
 
