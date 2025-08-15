@@ -32,7 +32,18 @@ export function setup(helper) {
         document.addEventListener(ev, wrappedHandler, { passive: false, capture: true });
     });
 
-    console.log("[DRAG] GTD Board 드래그 시스템 초기화 완료 (모달 보호 포함)");
+    // ✨ [핵심 수정] 태블릿에서 롱터치 시 컨텍스트 메뉴가 뜨는 현상 방지
+    // .task-node-self 요소 위에서 발생하는 contextmenu 이벤트를 감지하여 브라우저 기본 동작을 차단합니다.
+    document.addEventListener('contextmenu', function (e) {
+        // 이벤트가 드래그 가능한 작업 항목 내부에서 발생했는지 확인합니다.
+        if (e.target.closest('.task-node-self')) {
+            // 기본 컨텍스트 메뉴가 나타나는 것을 막습니다.
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+
+    console.log("[DRAG] GTD Board 드래그 시스템 초기화 완료 (모달 보호 및 컨텍스트 메뉴 차단 포함)");
 
     /* 사이드바 열림 시 RAF 취소 – 좌표 틀어짐 방지 */
     onSidebarToggled(() => {
