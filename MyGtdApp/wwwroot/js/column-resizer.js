@@ -22,7 +22,7 @@ class ColumnResizer {
         if (!containerElement) return;
 
         this.isDesktop = window.innerWidth >= 1200;
-        
+
         // 함수가 재호출될 때를 대비해, 이전에 생성된 핸들을 모두 제거하여 초기화합니다.
         containerElement.querySelectorAll('.column-resizer').forEach(r => r.remove());
 
@@ -56,7 +56,7 @@ class ColumnResizer {
 
         column.appendChild(resizer);
     }
-    
+
     handleMouseMove(e) {
         if (!this.isResizing) return;
         const newWidth = this.startWidth + (e.clientX - this.startX);
@@ -66,7 +66,7 @@ class ColumnResizer {
             this.currentResizingColumn.style.flex = `0 0 ${newWidth}px`;
         }
     }
-    
+
     handleMouseUp() {
         if (this.isResizing) {
             this.isResizing = false;
