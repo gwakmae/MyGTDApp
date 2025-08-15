@@ -29,36 +29,50 @@ namespace MyGtdApp.Services
 
         private void NotifyStateChanged() => OnChange?.Invoke();
 
-        public async Task<List<TaskItem>> GetActiveTasksAsync() // ✨ 추가
+        // ✨ 수정: 인터페이스와 일치하도록 bool showHidden 파라미터를 추가
+        public async Task<List<TaskItem>> GetActiveTasksAsync(bool showHidden)
         {
-            var allTasks = await _repository.GetAllRawAsync();
+            var allTasks = await _repository.GetAllAsync(); // 계층 구조로 가져옴
             var today = DateTime.Today;
 
-            // 자식 관계를 파악하기 위해 모든 작업을 조회하고 메모리에서 필터링
-            var taskLookup = allTasks.ToLookup(t => t.ParentId);
+            var activeFiltered = new List<TaskItem>();
 
-            return allTasks.Where(t =>
+            void FilterRecursive(IEnumerable<TaskItem> tasks, bool isParentHidden)
             {
-                // 1. Inbox 상태는 제외
-                if (t.Status == TaskStatus.Inbox) return false;
+                foreach (var task in tasks)
+                {
+                    bool isEffectivelyHidden = isParentHidden || task.IsHidden;
 
-                // 2. 프로젝트(자식이 있는 작업)는 제외
-                if (taskLookup.Contains(t.Id)) return false;
+                    if (showHidden || !isEffectivelyHidden)
+                    {
+                        bool meetsActiveCriteria =
+                            task.Status != TaskStatus.Inbox &&
+                            !task.Children.Any() &&
+                            !task.IsCompleted &&
+                            (!task.StartDate.HasValue || task.StartDate.Value.Date <= today);
 
-                // 3. 이미 완료된 작업은 제외
-                if (t.IsCompleted) return false;
+                        if (meetsActiveCriteria)
+                        {
+                            activeFiltered.Add(task);
+                        }
+                    }
 
-                // 4. 시작 날짜가 미래로 지정된 작업은 제외
-                if (t.StartDate.HasValue && t.StartDate.Value.Date > today) return false;
+                    if (task.Children.Any())
+                    {
+                        FilterRecursive(task.Children, isEffectivelyHidden);
+                    }
+                }
+            }
 
-                return true;
-            })
-            .OrderBy(t => t.Status)
-            .ThenBy(t => t.SortOrder)
-            .ToList();
+            FilterRecursive(allTasks, false);
+
+            return activeFiltered
+                .OrderBy(t => t.Status)
+                .ThenBy(t => t.SortOrder)
+                .ToList();
         }
 
-        // --- 기존 메서드들은 그대로 유지 ---
+        // --- 이하 다른 모든 메서드는 그대로 유지됩니다 ---
         public async Task<List<TaskItem>> GetAllTasksAsync() => await _repository.GetAllAsync();
 
         public async Task<TaskItem> AddTaskAsync(string title, TaskStatus status, int? parentId)

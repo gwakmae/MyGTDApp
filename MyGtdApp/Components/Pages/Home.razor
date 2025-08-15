@@ -37,10 +37,13 @@
 
                 <div class="header-center">
                     <div class="header-stats">
-                        <div class="stat-item">
-                            <span class="stat-number">@GetActiveLeafTasksCount()</span>
-                            <span class="stat-label">Active Tasks</span>
-                        </div>
+                        @* ✨ 수정: div를 a 태그로 변경하고 href="/active" 추가 *@
+                        <a href="active" class="stat-item-link">
+                            <div class="stat-item">
+                                <span class="stat-number">@GetActiveLeafTasksCount()</span>
+                                <span class="stat-label">Active Tasks</span>
+                            </div>
+                        </a>
                         <div class="stat-divider"></div>
                         <div class="stat-item">
                             <span class="stat-number">@todayTasks.Count</span>
@@ -195,15 +198,12 @@
 
         <div class="list-view-container">
             @{
-                var tasksToShow = IsFocusView ? focusTasks
-                : IsContextView ? contextTasks
-                : IsActiveTasksView ? activeTasks
-                : new List<TaskItem>();
+                var tasksToShow = GetTasksToShow();
             }
 
             @if (tasksToShow.Any())
             {
-                @foreach (var task in FilterTasks(tasksToShow))
+                @foreach (var task in tasksToShow)
                 {
                     <ProjectTaskNode @key="task.Id"
                                      Task="task"

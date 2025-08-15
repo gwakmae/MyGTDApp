@@ -48,9 +48,9 @@ namespace MyGtdApp.Services
         public Task<List<TaskItem>> GetFocusTasksAsync()
             => Task.FromResult(_queryHelper.GetFocusTasks());
 
-        // ✨ 추가: 인터페이스 구현 오류 해결
-        public Task<List<TaskItem>> GetActiveTasksAsync()
-            => Task.FromResult(_queryHelper.GetActiveTasks());
+        // ✨ 수정: 인터페이스 구현 오류 해결
+        public Task<List<TaskItem>> GetActiveTasksAsync(bool showHidden)
+            => Task.FromResult(_queryHelper.GetActiveTasks(showHidden));
 
         // --- Manipulation Methods (Write Operations) ---
         public Task<TaskItem> AddTaskAsync(string title, Models.TaskStatus status, int? parentId)

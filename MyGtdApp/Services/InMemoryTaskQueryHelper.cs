@@ -1,4 +1,5 @@
-﻿using MyGtdApp.Models;
+﻿// 파일명: Services/InMemoryTaskQueryHelper.cs
+using MyGtdApp.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,17 +15,43 @@ namespace MyGtdApp.Services
             _tasks = tasks;
         }
 
-        public List<TaskItem> GetActiveTasks()
+        // ✨ 수정: showHidden 파라미터를 받는 GetActiveTasks 메서드 구현
+        public List<TaskItem> GetActiveTasks(bool showHidden)
         {
             var today = DateTime.Today;
-            // ✨ 수정: .Value 앞에 null-forgiving 연산자(!) 추가
-            var parentIds = new HashSet<int>(_tasks.Where(t => t.ParentId.HasValue).Select(t => t.ParentId!.Value));
+            var allTasksAsTree = GetAllTasksAsTree(); // 계층 구조를 먼저 가져옴
+            var activeFiltered = new List<TaskItem>();
 
-            return _tasks.Where(t =>
-                t.Status != Models.TaskStatus.Inbox &&
-                !parentIds.Contains(t.Id) &&
-                !t.IsCompleted &&
-                (!t.StartDate.HasValue || t.StartDate.Value.Date <= today))
+            void FilterRecursive(IEnumerable<TaskItem> tasks, bool isParentHidden)
+            {
+                foreach (var task in tasks)
+                {
+                    bool isEffectivelyHidden = isParentHidden || task.IsHidden;
+
+                    if (showHidden || !isEffectivelyHidden)
+                    {
+                        bool meetsActiveCriteria =
+                            task.Status != Models.TaskStatus.Inbox &&
+                            !task.Children.Any() &&
+                            !task.IsCompleted &&
+                            (!task.StartDate.HasValue || task.StartDate.Value.Date <= today);
+
+                        if (meetsActiveCriteria)
+                        {
+                            activeFiltered.Add(task);
+                        }
+                    }
+
+                    if (task.Children.Any())
+                    {
+                        FilterRecursive(task.Children, isEffectivelyHidden);
+                    }
+                }
+            }
+
+            FilterRecursive(allTasksAsTree, false);
+
+            return activeFiltered
                 .OrderBy(t => t.Status)
                 .ThenBy(t => t.SortOrder)
                 .ToList();

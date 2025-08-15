@@ -23,7 +23,7 @@ namespace MyGtdApp.Services
         Task<List<TaskItem>> GetTasksByContextAsync(string context);
         Task<List<TaskItem>> GetFocusTasksAsync();
 
-        Task<List<TaskItem>> GetActiveTasksAsync(); // ✨ 추가
+        Task<List<TaskItem>> GetActiveTasksAsync(bool showHidden);
 
         Task BulkUpdateTasksAsync(BulkUpdateModel updateModel);
         Task DeleteTasksAsync(List<int> taskIds);

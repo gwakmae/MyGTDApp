@@ -1,4 +1,5 @@
-﻿using Microsoft.JSInterop;
+﻿// 파일명: Components/Pages/Home.UIState.cs
+using Microsoft.JSInterop;
 using MyGtdApp.Models;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,10 +10,7 @@ namespace MyGtdApp.Components.Pages
 {
     public partial class Home
     {
-        // ✨ hideCompleted를 Home.razor.cs에서 여기로 이동
         private bool hideCompleted = false;
-
-        // ✨ showHidden 정의
         private bool showHidden = false;
 
         private async Task LoadHideCompletedState()
@@ -47,7 +45,8 @@ namespace MyGtdApp.Components.Pages
         {
             hideCompleted = !hideCompleted;
             await SaveHideCompletedState();
-            StateHasChanged();
+            // ✨ 수정: 데이터를 다시 로드하여 변경사항을 완벽하게 반영
+            await RefreshDataBasedOnRoute();
         }
 
         private async Task LoadShowHiddenState()
@@ -82,10 +81,10 @@ namespace MyGtdApp.Components.Pages
         {
             showHidden = !showHidden;
             await SaveShowHiddenState();
-            StateHasChanged();
+            // ✨ 수정: 데이터를 다시 로드하여 변경사항을 완벽하게 반영
+            await RefreshDataBasedOnRoute();
         }
 
-        // ✨ 두 필터를 모두 처리하는 통합 필터 메서드
         private IEnumerable<TaskItem> FilterTasks(IEnumerable<TaskItem> src)
         {
             if (hideCompleted)
@@ -93,6 +92,8 @@ namespace MyGtdApp.Components.Pages
                 src = src.Where(t => !t.IsCompleted);
             }
 
+            // ✨ 참고: ActiveTasksView는 이미 서비스단에서 hidden 필터링이 완료되었으므로,
+            // 이 메서드는 Board View 등 다른 뷰에만 영향을 미칩니다.
             if (!showHidden)
             {
                 src = src.Where(t => !t.IsHidden);
@@ -100,7 +101,5 @@ namespace MyGtdApp.Components.Pages
 
             return src;
         }
-
-        // ✨ 기존 FilterCompleted 메서드는 삭제하고 위의 FilterTasks로 통합합니다.
     }
 }

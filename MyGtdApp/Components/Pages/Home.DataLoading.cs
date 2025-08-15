@@ -12,9 +12,10 @@ public partial class Home
 {
     private async Task RefreshDataBasedOnRoute()
     {
-        // ✨ 수정: ActiveTasksAsync 호출을 다른 뷰와 함께 로드하도록 변경
+        // ✨ 수정: activeTasks와 focusTasks를 항상 최신 상태로 먼저 불러옵니다.
+        // 이렇게 하면 어떤 뷰에 있든지 헤더의 숫자 집계가 정확해집니다.
         focusTasks = await TaskService.GetFocusTasksAsync();
-        activeTasks = await TaskService.GetActiveTasksAsync(); // 데이터 미리 로드
+        activeTasks = await TaskService.GetActiveTasksAsync(showHidden);
 
         if (IsFocusView)
         {
@@ -25,10 +26,10 @@ public partial class Home
             pageTitle = $"Context: @{Context}";
             contextTasks = await TaskService.GetTasksByContextAsync($"@{Context}");
         }
-        else if (IsActiveTasksView) // ✨ 추가: Active Tasks 뷰 처리
+        else if (IsActiveTasksView)
         {
             pageTitle = "Active Tasks";
-            // activeTasks는 위에서 이미 로드됨
+            // activeTasks는 위에서 이미 로드되었으므로 별도 작업이 필요 없습니다.
         }
         else
         {
@@ -46,7 +47,6 @@ public partial class Home
         renderedTasks.Clear();
         IEnumerable<TaskItem> roots;
 
-        // ✨ 수정: IsActiveTasksView 조건 추가
         if (IsFocusView) roots = focusTasks;
         else if (IsContextView) roots = contextTasks;
         else if (IsActiveTasksView) roots = activeTasks;
