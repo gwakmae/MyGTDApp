@@ -147,40 +147,60 @@ namespace MyGtdApp.Services
 
             bool completed = !task.IsCompleted;
 
-            if (completed)
-            {
-                task.OriginalStatus = task.Status;
-                task.Status = TaskStatus.Completed;
-            }
-            else
-            {
-                task.Status = task.OriginalStatus ?? TaskStatus.NextActions;
-                task.OriginalStatus = null;
-            }
-            task.IsCompleted = completed;
+            var toUpdate = new List<TaskItem>();
+            var processedIds = new HashSet<int>();
 
-            var toUpdate = new List<TaskItem> { task };
-
-            void Visit(int parent)
+            void UpdateRecursively(TaskItem currentTask, bool isCompleted)
             {
-                foreach (var child in lookup[parent])
+                if (!processedIds.Add(currentTask.Id)) return;
+
+                currentTask.IsCompleted = isCompleted;
+                if (isCompleted)
                 {
-                    child.IsCompleted = completed;
-                    if (completed)
+                    if (currentTask.Status != TaskStatus.Completed)
                     {
-                        child.OriginalStatus = child.Status;
-                        child.Status = TaskStatus.Completed;
+                        currentTask.OriginalStatus = currentTask.Status;
+                    }
+                    currentTask.Status = TaskStatus.Completed;
+                }
+                else
+                {
+                    currentTask.Status = currentTask.OriginalStatus ?? TaskStatus.NextActions;
+                    currentTask.OriginalStatus = null;
+                }
+                toUpdate.Add(currentTask);
+
+                foreach (var child in lookup[currentTask.Id])
+                {
+                    UpdateRecursively(child, isCompleted);
+                }
+            }
+
+            UpdateRecursively(task, completed);
+
+            // 🎯 [수정된 로직] 마지막 자식이 완료되면 부모도 완료 처리
+            if (completed && task.ParentId.HasValue)
+            {
+                var parent = allTasks.FirstOrDefault(t => t.Id == task.ParentId.Value);
+                while (parent != null && !parent.IsCompleted)
+                {
+                    var siblings = lookup[parent.Id].ToList();
+                    if (siblings.All(s => s.IsCompleted))
+                    {
+                        UpdateRecursively(parent, true);
+
+                        // 다음 부모로 이동하여 계속 확인
+                        parent = parent.ParentId.HasValue
+                            ? allTasks.FirstOrDefault(t => t.Id == parent.ParentId.Value)
+                            : null;
                     }
                     else
                     {
-                        child.Status = child.OriginalStatus ?? TaskStatus.NextActions;
-                        child.OriginalStatus = null;
+                        // 모든 자식이 완료되지 않았으므로 연쇄 중단
+                        break;
                     }
-                    toUpdate.Add(child);
-                    Visit(child.Id);
                 }
             }
-            Visit(task.Id);
 
             await _repository.UpdateRangeAsync(toUpdate);
             NotifyStateChanged();

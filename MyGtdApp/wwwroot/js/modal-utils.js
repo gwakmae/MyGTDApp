@@ -1,39 +1,15 @@
-// 배경 스크롤 차단/복원 함수 (기존 기능 유지)
+// 배경 스크롤 차단/복원 함수 (수정 코드 적용)
 window.preventBackgroundScroll = function (prevent) {
     const body = document.body;
     const html = document.documentElement;
-
     if (prevent) {
-        const isMobile = window.innerWidth <= 768;
-        if (isMobile) {
-            const scrollY = window.scrollY;
-            body.dataset.scrollY = scrollY.toString();
-            body.style.position = 'fixed';
-            body.style.top = `-${scrollY}px`;
-            body.style.left = '0';
-            body.style.right = '0';
-            body.style.width = '100%';
-            body.style.overflow = 'hidden';
-            html.style.overflow = 'hidden';
-            body.style.touchAction = 'none';
-        }
         body.classList.add('modal-open', 'disable-task-interaction', 'disable-task-selection');
+        body.style.overflow = 'hidden';
+        html.style.overflow = 'hidden';
     } else {
-        const isMobile = window.innerWidth <= 768;
-        if (isMobile) {
-            const scrollY = parseInt(body.dataset.scrollY || '0', 10);
-            body.style.position = '';
-            body.style.top = '';
-            body.style.left = '';
-            body.style.right = '';
-            body.style.width = '';
-            body.style.overflow = '';
-            body.style.touchAction = '';
-            html.style.overflow = '';
-            window.scrollTo(0, scrollY);
-            delete body.dataset.scrollY;
-        }
         body.classList.remove('modal-open', 'disable-task-interaction', 'disable-task-selection');
+        body.style.overflow = '';
+        html.style.overflow = '';
     }
 };
 

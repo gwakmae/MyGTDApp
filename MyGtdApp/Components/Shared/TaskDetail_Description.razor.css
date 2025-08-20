@@ -122,9 +122,11 @@
     margin-bottom: 1.5rem;
 }
 
+/* 🔧 핵심 수정: 헤더와 텍스트 영역 사이에 적절한 간격 추가 */
 .description-header {
-    padding-bottom: 0.5rem;
-    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    margin-top: 0.5rem; /* [수정] Title과의 간격을 확보하기 위해 상단 마진 추가 */
+    margin-bottom: 1rem;
     border-bottom: 2px solid #e5e7eb;
 }
 
@@ -151,14 +153,20 @@
     font-size: 0.875rem;
     box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
     .btn-expand:hover {
         box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+        transform: translateY(-1px);
     }
 
+/* 🔧 핵심 수정: 텍스트 영역 컨테이너에 상단 마진 추가 */
 .textarea-container {
     position: relative;
+    margin-top: 0.75rem; /* [수정] 헤더와의 간격 균형을 맞추기 위해 0.5rem -> 0.75rem으로 조정 */
     margin-bottom: 0.75rem;
 }
 
