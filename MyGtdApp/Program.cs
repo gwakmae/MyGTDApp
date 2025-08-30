@@ -5,6 +5,7 @@ using MyGtdApp.Components;
 using MyGtdApp.Models;
 using MyGtdApp.Repositories;
 using MyGtdApp.Services;
+using MyGtdApp.Services.Undo; // <-- using 문 추가
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -37,6 +38,10 @@ builder.Services.AddScoped<ITaskDataService, TaskDataService>();
 builder.Services.AddScoped<ITaskService, DatabaseTaskService>();
 builder.Services.AddScoped<ISidebarJsService, SidebarJsService>();
 builder.Services.AddScoped<IGtdBoardJsService, GtdBoardJsService>();
+
+// --- 아래 한 줄 추가 ---
+builder.Services.AddSingleton<IUndoService, UndoService>();
+
 builder.Services.AddControllers();
 
 // ------------------------------------------------------------

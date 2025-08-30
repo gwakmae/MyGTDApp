@@ -1,0 +1,61 @@
+﻿@using MyGtdApp.Services.Undo
+@using System.Threading
+
+@inject IUndoService UndoService
+@implements IDisposable
+
+@if (_latestAction != null && _visible)
+{
+    <div class="undo-snackbar">
+        <span>@_latestAction.Description</span>
+        <button class="undo-btn" @onclick="HandleUndo">실행 취소</button>
+        <button class="close-btn" @onclick="() => _visible = false">×</button>
+    </div>
+}
+
+@code {
+    private UndoAction? _latestAction;
+    private bool _visible = false;
+    private Timer? _timer;
+
+    protected override void OnInitialized()
+    {
+        UndoService.OnChange += HandleChange;
+    }
+
+    private void HandleChange()
+    {
+        _latestAction = UndoService.GetLatestAction();
+        if (_latestAction != null)
+        {
+            _visible = true;
+
+            // 10초 후에 자동으로 사라지도록 타이머 설정
+            _timer?.Dispose();
+            _timer = new Timer(_ =>
+            {
+                _visible = false;
+                InvokeAsync(StateHasChanged);
+            }, null, 10000, Timeout.Infinite);
+        }
+        else
+        {
+            _visible = false;
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleUndo()
+    {
+        _visible = false;
+        _timer?.Dispose();
+        await UndoService.UndoLatestAsync();
+    }
+
+    public void Dispose()
+    {
+        UndoService.OnChange -= HandleChange;
+        _timer?.Dispose();
+    }
+}

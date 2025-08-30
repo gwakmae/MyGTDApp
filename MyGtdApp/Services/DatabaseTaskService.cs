@@ -1,6 +1,8 @@
 ﻿// 파일명: Services/DatabaseTaskService.cs
+using Microsoft.EntityFrameworkCore;
 using MyGtdApp.Models;
 using MyGtdApp.Repositories;
+using MyGtdApp.Services.Undo; // <-- using 문 추가
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,17 +16,25 @@ namespace MyGtdApp.Services
         private readonly ITaskRepository _repository;
         private readonly ITaskMoveService _moveService;
         private readonly ITaskDataService _dataService;
+        // --- 아래 2개 필드 추가 ---
+        private readonly IUndoService _undo;
+        private readonly IDbContextFactory<GtdDbContext> _contextFactory;
 
         public event System.Action? OnChange;
 
+        // --- 생성자 수정 ---
         public DatabaseTaskService(
             ITaskRepository repository,
             ITaskMoveService moveService,
-            ITaskDataService dataService)
+            ITaskDataService dataService,
+            IUndoService undoService,
+            IDbContextFactory<GtdDbContext> contextFactory)
         {
             _repository = repository;
             _moveService = moveService;
             _dataService = dataService;
+            _undo = undoService; // 추가
+            _contextFactory = contextFactory; // 추가
         }
 
         private void NotifyStateChanged() => OnChange?.Invoke();
@@ -83,8 +93,10 @@ namespace MyGtdApp.Services
             return result;
         }
 
+        // --- DeleteTaskAsync, DeleteTasksAsync 수정 ---
         public async Task DeleteTaskAsync(int taskId)
         {
+            await PrepareDeleteUndo(new List<int> { taskId });
             await _repository.DeleteAsync(taskId);
             NotifyStateChanged();
         }
@@ -219,6 +231,7 @@ namespace MyGtdApp.Services
 
         public async Task DeleteTasksAsync(List<int> taskIds)
         {
+            await PrepareDeleteUndo(taskIds);
             await _repository.DeleteTasksAsync(taskIds);
             NotifyStateChanged();
         }
@@ -255,6 +268,90 @@ namespace MyGtdApp.Services
 
             await _repository.UpdateRangeAsync(tasksWithContext);
             NotifyStateChanged();
+        }
+
+        // --- 아래 3개의 새 메서드를 클래스 내부에 추가 ---
+
+        // 헬퍼: 삭제 직전의 Task 정보(스냅샷)를 Undo 서비스에 저장
+        private async Task PrepareDeleteUndo(List<int> rootIds)
+        {
+            var allRaw = await _repository.GetAllRawAsync();
+            var snapshot = CaptureSubtrees(allRaw, rootIds);
+
+            if (!snapshot.Any()) return;
+
+            _undo.Push(new UndoAction
+            {
+                Type = UndoActionType.Delete,
+                Description = $"{snapshot.Count}개 작업 삭제됨",
+                UndoAsync = async () =>
+                {
+                    await RestoreDeletedAsync(snapshot);
+                    NotifyStateChanged();
+                }
+            });
+        }
+
+        // 헬퍼: 삭제된 Task 들을 DB에 다시 삽입하는 복원 로직
+        private async Task RestoreDeletedAsync(List<TaskItem> items)
+        {
+            await using var ctx = _contextFactory.CreateDbContext();
+            // ID가 충돌할 수 있으므로, 복원하려는 항목과 ID가 같은 항목이 이미 DB에 있는지 확인하고 제거
+            var existingIds = items.Select(i => i.Id).ToList();
+            var conflicts = await ctx.Tasks.Where(t => existingIds.Contains(t.Id)).ToListAsync();
+            if (conflicts.Any())
+            {
+                ctx.Tasks.RemoveRange(conflicts);
+                await ctx.SaveChangesAsync();
+            }
+
+            ctx.Tasks.AddRange(items);
+            await ctx.SaveChangesAsync();
+            await Infrastructure.Seeders.FillPathDepth.RunAsync(ctx); // Path/Depth 재계산
+        }
+
+        // 헬퍼: 삭제할 Task와 그 모든 자식 Task들을 복사하여 스냅샷 생성
+        private static List<TaskItem> CaptureSubtrees(List<TaskItem> allRaw, IEnumerable<int> rootIds)
+        {
+            var map = allRaw.ToDictionary(t => t.Id);
+            var byParent = allRaw.ToLookup(t => t.ParentId);
+            var seen = new HashSet<int>();
+            var result = new List<TaskItem>();
+
+            foreach (var rootId in rootIds.Distinct())
+            {
+                if (map.ContainsKey(rootId)) Collect(rootId);
+            }
+            return result;
+
+            void Collect(int id)
+            {
+                if (!seen.Add(id)) return;
+                var src = map[id];
+                var copy = new TaskItem // 참조가 아닌 값으로 깊은 복사
+                {
+                    Id = src.Id,
+                    Title = src.Title,
+                    Description = src.Description,
+                    Priority = src.Priority,
+                    Status = src.Status,
+                    ParentId = src.ParentId,
+                    SortOrder = src.SortOrder,
+                    IsCompleted = src.IsCompleted,
+                    OriginalStatus = src.OriginalStatus,
+                    StartDate = src.StartDate,
+                    DueDate = src.DueDate,
+                    IsExpanded = src.IsExpanded,
+                    IsHidden = src.IsHidden,
+                    Path = src.Path,
+                    Depth = src.Depth,
+                    Contexts = new List<string>(src.Contexts)
+                };
+                result.Add(copy);
+
+                foreach (var child in byParent[id])
+                    Collect(child.Id);
+            }
         }
     }
 }
