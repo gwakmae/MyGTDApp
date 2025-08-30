@@ -10,5 +10,6 @@ namespace MyGtdApp.Services.Undo
         void Push(UndoAction action);
         Task<bool> UndoLatestAsync();
         UndoAction? GetLatestAction();
+        bool CanUndo();
     }
 }

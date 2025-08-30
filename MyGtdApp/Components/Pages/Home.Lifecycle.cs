@@ -14,7 +14,9 @@ public partial class Home : IAsyncDisposable
         // 이벤트 핸들러: async void 지양 → 동기 핸들러 + 내부 fire-and-forget Task
         NavManager.LocationChanged += HandleLocationChanged;
         TaskService.OnChange += HandleTaskServiceChange;
+        UndoService.OnChange += HandleUndoStateChanged;
 
+        canUndo = UndoService.CanUndo();
         await RefreshDataBasedOnRoute();
     }
 
@@ -53,6 +55,12 @@ public partial class Home : IAsyncDisposable
     private void HandleTaskServiceChange()
         => SafeRun(RefreshDataBasedOnRoute);
 
+    private void HandleUndoStateChanged()
+    {
+        canUndo = UndoService.CanUndo();
+        InvokeAsync(StateHasChanged);
+    }
+
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
         => SafeRun(RefreshDataBasedOnRoute);
 
@@ -60,6 +68,7 @@ public partial class Home : IAsyncDisposable
     {
         TaskService.OnChange -= HandleTaskServiceChange;
         NavManager.LocationChanged -= HandleLocationChanged;
+        UndoService.OnChange -= HandleUndoStateChanged;
 
         try
         {

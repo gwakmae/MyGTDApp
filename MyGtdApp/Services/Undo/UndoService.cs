@@ -48,7 +48,6 @@ namespace MyGtdApp.Services.Undo
             catch (Exception ex)
             {
                 Console.WriteLine($"[UNDO] Undo 작업 실패: {ex.Message}");
-                // 실패 시 다시 스택에 넣는 것을 고려할 수 있으나, 여기서는 단순하게 처리합니다.
                 return false;
             }
         }
@@ -58,6 +57,14 @@ namespace MyGtdApp.Services.Undo
             lock (_lock)
             {
                 return _stack.FirstOrDefault();
+            }
+        }
+
+        public bool CanUndo()
+        {
+            lock (_lock)
+            {
+                return _stack.Any();
             }
         }
     }

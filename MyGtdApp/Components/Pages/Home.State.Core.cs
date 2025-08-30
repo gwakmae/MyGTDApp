@@ -4,6 +4,7 @@ using Microsoft.JSInterop;
 using Microsoft.AspNetCore.Components.Routing;
 using MyGtdApp.Models;
 using MyGtdApp.Services;
+using MyGtdApp.Services.Undo;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,6 +19,7 @@ public partial class Home
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
     [Inject] private IGtdBoardJsService BoardJs { get; set; } = default!;
     [Inject] private NavigationManager NavManager { get; set; } = default!;
+    [Inject] private IUndoService UndoService { get; set; } = default!;
 
     /* ───────── Route Parameter ───────── */
     [Parameter] public string? Context { get; set; }
@@ -33,6 +35,8 @@ public partial class Home
     private List<TaskItem> renderedTasks = new();
 
     /* ───────── UI / Interaction State ───────── */
+    private bool canUndo = false;
+
     private TaskStatus? addingTaskStatus = null;
     private string newTaskTitle = "";
     private ElementReference quickAddInputRef;
