@@ -37,7 +37,7 @@ builder.Services.AddScoped<ITaskDataService, TaskDataService>();
 builder.Services.AddScoped<ITaskService, DatabaseTaskService>();
 builder.Services.AddScoped<ISidebarJsService, SidebarJsService>();
 builder.Services.AddScoped<IGtdBoardJsService, GtdBoardJsService>();
-
+builder.Services.AddControllers();
 
 // ------------------------------------------------------------
 // 3. Blazor 컴포넌트
@@ -142,6 +142,8 @@ app.Use(async (ctx, next) =>
 
 app.UseStaticFiles();
 app.UseAntiforgery();
+
+app.MapControllers();
 
 app.MapRazorComponents<App>()
    .AddInteractiveServerRenderMode();

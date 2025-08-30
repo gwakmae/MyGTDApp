@@ -473,6 +473,10 @@ Thumbs.db
 *.p12
 dev-certs/
 
+# Launch settings (개발자별 설정이므로 제외)
+Properties/launchSettings.json
+**/Properties/launchSettings.json
+
 # Local configuration overrides
 appsettings.Development.json
 appsettings.Local.json

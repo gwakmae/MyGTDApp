@@ -30,6 +30,13 @@ class ColumnResizer {
             const columns = containerElement.querySelectorAll('.board-column.resizable');
             columns.forEach(column => this.addResizer(column));
             this.loadColumnWidths(containerElement);
+        } else {
+            // [수정] 모바일/태블릿 뷰로 전환될 때, 인라인 스타일을 모두 제거합니다.
+            const columns = containerElement.querySelectorAll('.board-column.resizable');
+            columns.forEach(column => {
+                column.style.width = '';
+                column.style.flex = '';
+            });
         }
     }
 
