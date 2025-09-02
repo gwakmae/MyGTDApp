@@ -7,9 +7,13 @@
      @ondblclick:preventDefault="true"
      @ondblclick:stopPropagation="true">
 
-    <i class="bi @(Task.IsCompleted ? "bi-check-square" : "bi-square") task-checkbox"
-       @onclick="HandleCheckboxClick"
-       @onclick:stopPropagation="true"></i>
+    @* ▼ [수정] 기존 <i> 태그를 <button>으로 감싸 터치 영역을 넓히고 의미를 명확히 합니다. *@
+    <button type="button"
+            class="task-checkbox-btn"
+            @onclick="HandleCheckboxClick"
+            @onclick:stopPropagation="true">
+        <i class="bi @(Task.IsCompleted ? "bi-check-square" : "bi-square") task-checkbox"></i>
+    </button>
 
     <span class="task-title">@Task.Title</span>
 

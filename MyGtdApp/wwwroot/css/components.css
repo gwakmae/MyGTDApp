@@ -12,15 +12,36 @@
     opacity: 0.4;
 }
 
-/* 🆕 추가: 다중 선택된 항목 스타일 */
-.task-node-self.is-selected {
+/* ▼ [수정] 어떤 종류의 선택이든 공통적으로 적용될 기본 하이라이트 스타일 */
+.task-node-self.is-selected-single,
+.task-node-self.is-multiselected {
     background-color: #e9f2ff; /* 연한 파란색 배경 */
-    border-color: #b3d4ff; /* 테두리 색상도 변경 */
+    border-color: #b3d4ff;
 }
 
-    /* 🆕 추가: 선택된 상태에서 호버 시에도 스타일 유지 */
-    .task-node-self.is-selected:hover {
+    /* ▼ [수정] 선택된 상태에서 호버 시 스타일 유지 */
+    .task-node-self.is-selected-single:hover,
+    .task-node-self.is-multiselected:hover {
         background-color: #dbeaff;
+    }
+
+    /* "다중 선택" 상태일 때만 체크 표시(✓)를 추가하는 스타일 */
+    .task-node-self.is-multiselected::after {
+        content: '✓';
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        width: 20px;
+        height: 20px;
+        background: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        font-weight: bold;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
 
 .task-card-content {
@@ -65,18 +86,6 @@
         transform: scale(0.99);
     }
 
-    /* 🆕 추가: 선택된 아이템 강조 */
-    .task-node-self.is-selected {
-        background-color: #e9f2ff;
-        border-color: #b3d4ff;
-        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-    }
-
-        /* 🆕 추가: 선택된 상태에서 호버 시에도 스타일 유지 */
-        .task-node-self.is-selected:hover {
-            background-color: #dbeaff;
-        }
-
     .task-node-self.drop-inside {
         background: rgba(59,130,246,.15); /* 유지 */
         border-color: var(--primary-600); /* 동일 색조 */
@@ -104,9 +113,8 @@
 
 /* 드래그 준비 상태 피드백 */
 .task-node-self.drag-ready {
-    transform: scale(1.01);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    background-color: #f3e5f5;
+    background-color: rgba(59, 130, 246, 0.05);
+    outline: 2px dashed rgba(59, 130, 246, 0.5);
 }
 
 .task-card-wrapper {
@@ -217,8 +225,6 @@
     line-height: 1;
 }
 
-/* ----- [수정코드 추가 시작] ----- */
-
 /* 홈 컨테이너 */
 .home-container {
     height: 100%;
@@ -251,48 +257,28 @@
     }
 }
 
-/* 선택 모드일 때 태스크 카드 스타일 개선 */
-.task-node-self.is-selected {
-    background-color: #e9f2ff;
-    border-color: #b3d4ff;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-    position: relative;
+/* "다중 선택" 상태일 때만 체크 표시(✓)를 추가하는 스타일 */
+.task-node-self.is-multiselected::after {
+    content: '✓';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
-    .task-node-self.is-selected::after {
-        content: '✓';
-        position: absolute;
-        top: -8px;
-        right: -8px;
-        width: 20px;
-        height: 20px;
-        background: var(--primary-color);
-        color: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.75rem;
-        font-weight: bold;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-
-/* 모바일에서 다중 선택 모드일 때 태스크 선택 가능 표시 */
+/* 모바일 화면에서도 동일하게 다중 선택 시에만 체크 표시가 나타나도록 수정 */
 @media (max-width: 1199px) {
-    .mobile-multiselect-mode .task-node-self:not(.is-selected) {
-        border: 2px dashed #ccc;
-        background-color: rgba(0,0,0,0.02);
-    }
-
-        .mobile-multiselect-mode .task-node-self:not(.is-selected):hover {
-            border-color: var(--primary-color);
-            background-color: rgba(59, 130, 246, 0.05);
-        }
-}
-
-/* 🆕 모바일에서 선택된 항목 시각적 피드백 강화 */
-@media (max-width: 1199px) {
-    .task-node-self.is-selected::before {
+    .task-node-self.is-multiselected::before {
         content: '✓';
         position: absolute;
         top: -8px;
@@ -312,7 +298,19 @@
     }
 }
 
-/* ----- [수정코드 추가 끝] ----- */
+/* 🆕 모바일에서 선택된 항목 시각적 피드백 강화 */
+@media (max-width: 1199px) {
+    .mobile-multiselect-mode .task-node-self:not(.is-multiselected) {
+        border: 2px dashed #ccc;
+        background-color: rgba(0,0,0,0.02);
+    }
+
+        .mobile-multiselect-mode .task-node-self:not(.is-multiselected):hover {
+            border-color: var(--primary-color);
+            background-color: rgba(59, 130, 246, 0.05);
+        }
+}
+
 
 /* 🆕 두 손가락 터치 시각적 피드백 */
 .task-node-self.multi-touch-active {
@@ -366,3 +364,24 @@
             cursor: pointer;
             opacity: 1;
         }
+
+/* 🎨 File: wwwroot/css/components.css */
+
+.task-checkbox-btn {
+    border: none;
+    background: transparent;
+    padding: 6px 8px; /* 터치 영역 확보 */
+    margin-right: 2px;
+    display: flex;
+    cursor: pointer;
+    border-radius: 50%;
+    touch-action: manipulation;
+}
+
+    .task-checkbox-btn:active, .task-checkbox-btn:hover {
+        background: rgba(0,0,0,0.07);
+    }
+
+.task-checkbox {
+    font-size: 1rem; /* 아이콘 크기 */
+}

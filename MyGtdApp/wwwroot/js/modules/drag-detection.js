@@ -44,7 +44,8 @@ export function isDraggableTarget(target) {
         return false;
     }
 
-    if (target.closest("button, input[type=checkbox], .sidebar-toggle-btn, .mobile-header")) {
+    // ▼ [수정] 새로 추가한 .task-checkbox-btn과 삭제 버튼 등을 드래그 대상에서 명시적으로 제외합니다.
+    if (target.closest("button, input[type=checkbox], .sidebar-toggle-btn, .mobile-header, .task-checkbox-btn, .simple-delete")) {
         console.log("[DRAG] 버튼 요소 무시");
         return false;
     }

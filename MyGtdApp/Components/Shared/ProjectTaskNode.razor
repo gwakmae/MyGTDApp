@@ -5,7 +5,7 @@
 
 <div class="task-node @(DraggedTaskId == Task.Id ? "is-ghost" : "")">
 
-    <div class="task-node-self @DropIndicatorClass @InvalidClass @(IsSelected ? "is-selected" : "") @(GetClickFeedbackClass())"
+    <div class="task-node-self @DropIndicatorClass @InvalidClass @GetSelectionClass() @(GetClickFeedbackClass())"
          draggable="true"
          data-task-id="@Task.Id"
          @onclick="HandleClick"
@@ -89,6 +89,11 @@
 
     [Parameter] public bool IsSelected { get; set; }
     [Parameter] public List<int> SelectedTaskIds { get; set; } = new();
+
+    // ▼ [추가] 부모로부터 다중 선택 컨텍스트를 전달받는 파라미터
+    [Parameter] public bool IsMultiSelectModeActive { get; set; }
+    [Parameter] public int SelectedCount { get; set; }
+
     [Parameter] public EventCallback<(int taskId, MouseEventArgs e)> OnClick { get; set; }
 
     [Parameter] public EventCallback OnTaskAdded { get; set; }
@@ -116,6 +121,21 @@
         _ => ""
     };
     private string InvalidClass => dropInvalid ? "drop-invalid" : "";
+
+    // ▼ [추가] 선택 상태에 따라 적절한 CSS 클래스를 반환하는 메서드
+    private string GetSelectionClass()
+    {
+        if (!IsSelected) return "";
+
+        // 다중 선택 모드가 활성화되었거나, 2개 이상 선택되었을 때만 'is-multiselected' 클래스 반환
+        if (IsMultiSelectModeActive || SelectedCount > 1)
+        {
+            return "is-multiselected";
+        }
+
+        // 그 외의 경우 (단 1개만 선택된 경우)는 'is-selected-single' 클래스 반환
+        return "is-selected-single";
+    }
 
     // 🆕 클릭 피드백 클래스 개선
     private string GetClickFeedbackClass()

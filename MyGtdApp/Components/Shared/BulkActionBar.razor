@@ -1,6 +1,6 @@
 @using MyGtdApp.Models
 
-<div class="bulk-action-bar @(SelectedTaskIds.Any() ? "visible" : "")">
+<div class="bulk-action-bar @((IsMultiSelectMode || SelectedTaskIds.Count > 1) ? "visible" : "")">
     <div class="bar-content">
         <span class="selection-count">@(SelectedTaskIds.Count)개 선택됨</span>
         <div class="actions">
@@ -18,6 +18,10 @@
 @code {
     [Parameter]
     public List<int> SelectedTaskIds { get; set; } = new();
+
+    // ▼ [추가] 부모로부터 다중 선택 모드 상태를 전달받는 파라미터
+    [Parameter]
+    public bool IsMultiSelectMode { get; set; }
 
     [Parameter]
     public EventCallback OnEditClick { get; set; }

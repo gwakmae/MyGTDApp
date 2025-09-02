@@ -64,7 +64,7 @@ function startSingleTouchTimers(element) {
         if (Constants.candidateElement && !Constants.isDragging && !Constants.isMultiTouch) {
             Constants.setReadyToDrag(true);
             console.log("[DRAG] 드래그 준비 완료 (한 손가락 롱프레스).");
-            // ✅ 중요: 여기서 선택 모드를 절대 활성화하지 않습니다.
+            Constants.candidateElement.classList.add('drag-ready'); // ✨ 시각적 피드백 클래스 추가
         }
     }, Constants.DRAG_DELAY);
     Constants.setPressTimer(dragTimer);

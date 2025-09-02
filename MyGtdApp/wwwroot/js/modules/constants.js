@@ -1,7 +1,7 @@
 ﻿// 드래그 앤 드롭 관련 상수 및 전역 변수
 
 // ===== 상수 =====
-export const DRAG_DELAY = 600;      // 드래그만 담당
+export const DRAG_DELAY = 450;
 export const MULTI_TOUCH_SELECTION_DELAY = 800; // 🆕 두 손가락 선택 모드
 export const MOVE_TOLERANCE = 15;
 export const MIN_DRAG_DISTANCE = 25;

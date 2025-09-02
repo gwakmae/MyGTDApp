@@ -100,6 +100,8 @@
                         <ProjectTaskNode @key="task.Id"
                                          Task="task"
                                          IsSelected="selectedTaskIds.Contains(task.Id)"
+                                         IsMultiSelectModeActive="isMultiSelectMode"
+                                         SelectedCount="selectedTaskIds.Count"
                                          SelectedTaskIds="selectedTaskIds"
                                          OnClick="(args) => HandleTaskClick(args.taskId, args.e)"
                                          HideCompleted="hideCompleted"
@@ -147,6 +149,8 @@
                             <ProjectTaskNode @key="task.Id"
                                              Task="task"
                                              IsSelected="selectedTaskIds.Contains(task.Id)"
+                                             IsMultiSelectModeActive="isMultiSelectMode"
+                                             SelectedCount="selectedTaskIds.Count"
                                              SelectedTaskIds="selectedTaskIds"
                                              OnClick="(args) => HandleTaskClick(args.taskId, args.e)"
                                              HideCompleted="hideCompleted"
@@ -220,6 +224,8 @@
                     <ProjectTaskNode @key="task.Id"
                                      Task="task"
                                      IsSelected="selectedTaskIds.Contains(task.Id)"
+                                     IsMultiSelectModeActive="isMultiSelectMode"
+                                     SelectedCount="selectedTaskIds.Count"
                                      SelectedTaskIds="selectedTaskIds"
                                      OnClick="(args) => HandleTaskClick(args.taskId, args.e)"
                                      HideCompleted="hideCompleted"
@@ -265,6 +271,7 @@
     }
 
     <BulkActionBar SelectedTaskIds="selectedTaskIds"
+                   IsMultiSelectMode="isMultiSelectMode"
                    OnEditClick="OpenBulkEditPanel"
                    OnDeleteClick="HandleDeleteSelected"
                    OnDeselectAllClick="DeselectAll" />

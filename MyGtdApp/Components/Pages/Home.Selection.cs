@@ -11,11 +11,12 @@ public partial class Home
 {
     private void HandleTaskClick(int taskId, MouseEventArgs e)
     {
-        if (e.Detail == 2)
-        {
-            ShowEditModal(taskId);
-            return;
-        }
+        // [제거] e.Detail == 2 분기는 TaskCard의 @ondblclick과 중복되므로 제거합니다.
+        // if (e.Detail == 2)
+        // {
+        //     ShowEditModal(taskId);
+        //     return;
+        // }
 
         if (isMultiSelectMode || e.CtrlKey || e.ShiftKey)
         {
@@ -45,8 +46,9 @@ public partial class Home
         }
         else
         {
-            if (selectedTaskIds.Any())
-                selectedTaskIds.Clear();
+            // ▼ [핵심 수정] 단일 클릭 시, 기존 선택을 지우고 현재 클릭한 항목을 선택합니다.
+            selectedTaskIds.Clear();
+            selectedTaskIds.Add(taskId);
         }
 
         lastClickedTaskId = taskId;
